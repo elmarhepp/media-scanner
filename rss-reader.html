@@ -1,0 +1,1544 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RSS Feed Reader</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            min-height: 100vh;
+            margin: 0;
+            display: flex;
+        }
+
+        .sidebar {
+            position: fixed;
+            left: 0;
+            top: 0;
+            width: 280px;
+            height: 100vh;
+            background: white;
+            box-shadow: 2px 0 8px rgba(0, 0, 0, 0.1);
+            overflow-y: auto;
+            z-index: 100;
+            padding: 20px;
+        }
+
+        .sidebar-header {
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #ecf0f1;
+        }
+
+        .sidebar-title {
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: #2c3e50;
+            margin-bottom: 10px;
+        }
+
+        .sidebar-feed-list {
+            list-style: none;
+        }
+
+        .sidebar-feed-item {
+            margin-bottom: 8px;
+            padding: 12px;
+            border-radius: 8px;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: #f8f9fa;
+        }
+
+        .sidebar-feed-item:hover {
+            background: #e9ecef;
+        }
+
+        .sidebar-feed-item.disabled {
+            opacity: 0.5;
+        }
+
+        .sidebar-feed-item.dragging {
+            opacity: 0.5;
+            transform: scale(0.98);
+        }
+
+        .sidebar-feed-item.drag-over {
+            border-top: 3px solid #3498db;
+            margin-top: 5px;
+        }
+
+        .drag-handle {
+            cursor: grab;
+            color: #95a5a6;
+            font-size: 1.2rem;
+            padding: 0 4px;
+            transition: color 0.2s ease;
+            flex-shrink: 0;
+            user-select: none;
+        }
+
+        .drag-handle:hover {
+            color: #3498db;
+        }
+
+        .drag-handle:active {
+            cursor: grabbing;
+        }
+
+        .feed-name-clickable {
+            flex: 1;
+            cursor: pointer;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .sidebar-feed-name {
+            flex: 1;
+            font-size: 0.9rem;
+            font-weight: 500;
+            color: #2c3e50;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .toggle-switch {
+            position: relative;
+            width: 40px;
+            height: 20px;
+            background: #95a5a6;
+            border-radius: 10px;
+            transition: background 0.3s ease;
+            cursor: pointer;
+            flex-shrink: 0;
+        }
+
+        .toggle-switch.active {
+            background: #27ae60;
+        }
+
+        .toggle-switch::after {
+            content: '';
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 16px;
+            height: 16px;
+            background: white;
+            border-radius: 50%;
+            transition: transform 0.3s ease;
+        }
+
+        .toggle-switch.active::after {
+            transform: translateX(20px);
+        }
+
+        .main-content {
+            margin-left: 280px;
+            width: calc(100% - 280px);
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        header {
+            background: white;
+            padding: 30px;
+            border-radius: 16px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.07);
+            margin-bottom: 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+
+        h1 {
+            font-size: 2rem;
+            color: #2c3e50;
+            font-weight: 700;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        button {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        button:hover {
+            background: #2980b9;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(52, 152, 219, 0.4);
+        }
+
+        button.secondary {
+            background: #95a5a6;
+        }
+
+        button.secondary:hover {
+            background: #7f8c8d;
+            box-shadow: 0 4px 12px rgba(149, 165, 166, 0.4);
+        }
+
+        button.danger {
+            background: #e74c3c;
+            padding: 6px 12px;
+            font-size: 12px;
+        }
+
+        button.danger:hover {
+            background: #c0392b;
+            box-shadow: 0 4px 12px rgba(231, 76, 60, 0.4);
+        }
+
+        .feeds-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 24px;
+        }
+
+        .feed-card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+            overflow: hidden;
+            transition: all 0.3s ease;
+            display: flex;
+            flex-direction: column;
+            scroll-margin-top: 20px;
+        }
+
+        .feed-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.12);
+        }
+
+        .feed-header {
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .feed-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            flex: 1;
+            margin-right: 10px;
+        }
+
+        .feed-content {
+            padding: 20px;
+        }
+
+        .feed-actions {
+            display: flex;
+            gap: 6px;
+        }
+
+        button.edit {
+            background: #f39c12;
+            padding: 6px 12px;
+            font-size: 12px;
+        }
+
+        button.edit:hover {
+            background: #e67e22;
+            box-shadow: 0 4px 12px rgba(243, 156, 18, 0.4);
+        }
+
+        .feed-url-info {
+            font-size: 0.75rem;
+            opacity: 0.9;
+            margin-top: 4px;
+            font-style: italic;
+        }
+
+        .article {
+            padding: 16px 0;
+            border-bottom: 1px solid #ecf0f1;
+        }
+
+        .article:last-child {
+            border-bottom: none;
+        }
+
+        .article-title {
+            font-size: 1rem;
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 8px;
+            line-height: 1.4;
+        }
+
+        .article-title a {
+            color: #2c3e50;
+            text-decoration: none;
+            transition: color 0.2s ease;
+        }
+
+        .article-title a:hover {
+            color: #3498db;
+        }
+
+        .article-meta {
+            font-size: 0.85rem;
+            color: #7f8c8d;
+            margin-bottom: 8px;
+        }
+
+        .article-description {
+            font-size: 0.9rem;
+            color: #546e7a;
+            line-height: 1.5;
+            display: -webkit-box;
+            -webkit-line-clamp: 3;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #7f8c8d;
+            font-style: italic;
+        }
+
+        .error {
+            text-align: center;
+            padding: 20px;
+            color: #e74c3c;
+            background: #fadbd8;
+            border-radius: 8px;
+            margin: 10px;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #95a5a6;
+        }
+
+        .empty-state-icon {
+            font-size: 4rem;
+            margin-bottom: 20px;
+        }
+
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 30px;
+            border-radius: 16px;
+            max-width: 500px;
+            width: 90%;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+        }
+
+        .modal-header {
+            margin-bottom: 20px;
+        }
+
+        .modal-header h2 {
+            color: #2c3e50;
+            font-size: 1.5rem;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #2c3e50;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        input[type="text"],
+        input[type="url"] {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ecf0f1;
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: border-color 0.3s ease;
+        }
+
+        input[type="text"]:focus,
+        input[type="url"]:focus {
+            outline: none;
+            border-color: #3498db;
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+
+        /* Scrollbar Styling */
+        .feed-content::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .feed-content::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+
+        .feed-content::-webkit-scrollbar-thumb {
+            background: #bdc3c7;
+            border-radius: 3px;
+        }
+
+        .feed-content::-webkit-scrollbar-thumb:hover {
+            background: #95a5a6;
+        }
+
+        /* Scrollbar Sidebar */
+        .sidebar::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .sidebar::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+
+        .sidebar::-webkit-scrollbar-thumb {
+            background: #bdc3c7;
+            border-radius: 3px;
+        }
+
+        /* Responsive */
+        @media (max-width: 1024px) {
+            .sidebar {
+                width: 240px;
+            }
+
+            .main-content {
+                margin-left: 240px;
+                width: calc(100% - 240px);
+            }
+
+            .search-input {
+                width: 200px;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .sidebar {
+                transform: translateX(-100%);
+                transition: transform 0.3s ease;
+            }
+
+            .sidebar.mobile-open {
+                transform: translateX(0);
+            }
+
+            .main-content {
+                margin-left: 0;
+                width: 100%;
+            }
+
+            h1 {
+                font-size: 1.5rem;
+            }
+
+            .feeds-grid {
+                grid-template-columns: 1fr;
+            }
+
+            header {
+                padding: 20px;
+            }
+
+            .mobile-menu-btn {
+                display: block;
+            }
+
+            .search-input {
+                width: 100%;
+                max-width: 250px;
+            }
+
+            .header-actions {
+                flex-wrap: wrap;
+                width: 100%;
+            }
+
+            .search-container {
+                order: 3;
+                width: 100%;
+                margin-top: 10px;
+            }
+
+            .search-input {
+                max-width: 100%;
+            }
+        }
+
+        .mobile-menu-btn {
+            display: none;
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1.2rem;
+        }
+
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #3498db;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Search Styles */
+        .search-container {
+            position: relative;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .search-input {
+            padding: 12px 16px;
+            border: 2px solid #ecf0f1;
+            border-radius: 8px;
+            font-size: 14px;
+            width: 300px;
+            transition: all 0.3s ease;
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: #3498db;
+            box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+        }
+
+        .search-results-container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+            padding: 30px;
+            margin-bottom: 20px;
+        }
+
+        .search-results-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #ecf0f1;
+        }
+
+        .search-results-title {
+            font-size: 1.3rem;
+            font-weight: 700;
+            color: #2c3e50;
+        }
+
+        .search-results-count {
+            font-size: 0.9rem;
+            color: #7f8c8d;
+            font-weight: 500;
+        }
+
+        .search-result-item {
+            padding: 20px;
+            border-bottom: 1px solid #ecf0f1;
+            transition: background 0.2s ease;
+        }
+
+        .search-result-item:last-child {
+            border-bottom: none;
+        }
+
+        .search-result-item:hover {
+            background: #f8f9fa;
+        }
+
+        .search-result-feed {
+            display: inline-block;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 4px 12px;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .search-highlight {
+            background: #fff3cd;
+            padding: 2px 4px;
+            border-radius: 3px;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <!-- Sidebar Navigation -->
+    <div id="sidebar" class="sidebar">
+        <div class="sidebar-header">
+            <div class="sidebar-title">📰 Feeds</div>
+            <button onclick="openAddFeedModal()" style="width: 100%; margin-top: 10px;">
+                <span>➕</span> Neuer Feed
+            </button>
+        </div>
+        <ul id="sidebarFeedList" class="sidebar-feed-list">
+            <!-- Feed-Liste wird hier eingefügt -->
+        </ul>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content">
+        <div class="container">
+            <header>
+                <div style="display: flex; align-items: center; gap: 15px;">
+                    <button class="mobile-menu-btn" onclick="toggleMobileMenu()">☰</button>
+                    <h1>RSS Feed Reader</h1>
+                </div>
+                <div class="header-actions">
+                    <div class="search-container">
+                        <input type="text"
+                               id="searchInput"
+                               class="search-input"
+                               placeholder="Artikel durchsuchen..."
+                               onkeyup="handleSearchInput(event)">
+                        <button onclick="performSearch()" style="display: none;" id="searchBtn">
+                            <span>🔍</span> Suchen
+                        </button>
+                        <button onclick="clearSearch()" class="secondary" style="display: none;" id="clearSearchBtn">
+                            <span>✕</span> Zurücksetzen
+                        </button>
+                    </div>
+                    <button onclick="refreshAllFeeds()" class="secondary">
+                        <span>🔄</span> Aktualisieren
+                    </button>
+                </div>
+            </header>
+
+            <div id="feedsGrid" class="feeds-grid">
+                <div class="empty-state">
+                    <div class="empty-state-icon">📭</div>
+                    <h2>Keine Feeds vorhanden</h2>
+                    <p>Füge deinen ersten RSS-Feed hinzu, um loszulegen!</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal für Feed hinzufügen -->
+    <div id="addFeedModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>RSS Feed hinzufügen</h2>
+            </div>
+            <form onsubmit="addFeed(event)">
+                <div class="form-group">
+                    <label for="feedName">Feed Name</label>
+                    <input type="text" id="feedName" placeholder="z.B. Tagesschau" required>
+                </div>
+                <div class="form-group">
+                    <label for="feedUrl">Feed URL (primär)</label>
+                    <input type="url" id="feedUrl" placeholder="https://example.com/rss" required>
+                </div>
+                <div class="form-group">
+                    <label for="feedFallbackUrl">Fallback URL (optional)</label>
+                    <input type="url" id="feedFallbackUrl" placeholder="https://example.com/rss-alternate">
+                </div>
+                <div class="modal-actions">
+                    <button type="button" onclick="closeAddFeedModal()" class="secondary">Abbrechen</button>
+                    <button type="submit">Hinzufügen</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal für Feed bearbeiten -->
+    <div id="editFeedModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>RSS Feed bearbeiten</h2>
+            </div>
+            <form onsubmit="updateFeed(event)">
+                <input type="hidden" id="editFeedId">
+                <div class="form-group">
+                    <label for="editFeedName">Feed Name</label>
+                    <input type="text" id="editFeedName" placeholder="z.B. Tagesschau" required>
+                </div>
+                <div class="form-group">
+                    <label for="editFeedUrl">Feed URL (primär)</label>
+                    <input type="url" id="editFeedUrl" placeholder="https://example.com/rss" required>
+                </div>
+                <div class="form-group">
+                    <label for="editFeedFallbackUrl">Fallback URL (optional)</label>
+                    <input type="url" id="editFeedFallbackUrl" placeholder="https://example.com/rss-alternate">
+                </div>
+                <div class="modal-actions">
+                    <button type="button" onclick="closeEditFeedModal()" class="secondary">Abbrechen</button>
+                    <button type="submit">Speichern</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // LocalStorage Schlüssel
+        const STORAGE_KEY = 'rss-feeds';
+
+        // CORS Proxies (werden der Reihe nach versucht)
+        const CORS_PROXIES = [
+            'https://api.allorigins.win/raw?url=',
+            'https://corsproxy.io/?',
+            'https://api.codetabs.com/v1/proxy?quest=',
+            'https://cors-anywhere.herokuapp.com/'
+        ];
+
+        // Feed-Verwaltung
+        class FeedManager {
+            constructor() {
+                this.feeds = this.loadFeeds();
+            }
+
+            loadFeeds() {
+                const stored = localStorage.getItem(STORAGE_KEY);
+                return stored ? JSON.parse(stored) : [];
+            }
+
+            saveFeeds() {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(this.feeds));
+            }
+
+            addFeed(name, url, fallbackUrl = '') {
+                const feed = {
+                    id: Date.now().toString(),
+                    name: name,
+                    url: url,
+                    fallbackUrl: fallbackUrl,
+                    active: true,
+                    addedAt: new Date().toISOString()
+                };
+                this.feeds.push(feed);
+                this.saveFeeds();
+                return feed;
+            }
+
+            updateFeed(id, name, url, fallbackUrl = '') {
+                const feed = this.feeds.find(f => f.id === id);
+                if (feed) {
+                    feed.name = name;
+                    feed.url = url;
+                    feed.fallbackUrl = fallbackUrl;
+                    this.saveFeeds();
+                    return feed;
+                }
+                return null;
+            }
+
+            toggleFeedActive(id) {
+                const feed = this.feeds.find(f => f.id === id);
+                if (feed) {
+                    feed.active = !feed.active;
+                    this.saveFeeds();
+                    return feed;
+                }
+                return null;
+            }
+
+            removeFeed(id) {
+                this.feeds = this.feeds.filter(feed => feed.id !== id);
+                this.saveFeeds();
+            }
+
+            reorderFeeds(fromIndex, toIndex) {
+                const [movedFeed] = this.feeds.splice(fromIndex, 1);
+                this.feeds.splice(toIndex, 0, movedFeed);
+                this.saveFeeds();
+            }
+
+            getFeed(id) {
+                return this.feeds.find(f => f.id === id);
+            }
+
+            getAllFeeds() {
+                return this.feeds;
+            }
+        }
+
+        const feedManager = new FeedManager();
+
+        // Globale Artikel-Sammlung für Suche
+        let allArticles = [];
+        let isSearchActive = false;
+
+        // RSS Feed laden und parsen mit Fallback
+        async function fetchFeedWithFallback(feed) {
+            let lastError = null;
+
+            // Primäre URL versuchen
+            try {
+                console.log(`Lade Feed von primärer URL: ${feed.url}`);
+                return await fetchFeed(feed.url);
+            } catch (error) {
+                console.warn(`Primäre URL fehlgeschlagen: ${error.message}`);
+                lastError = error;
+            }
+
+            // Fallback URL versuchen, falls vorhanden
+            if (feed.fallbackUrl && feed.fallbackUrl.trim()) {
+                try {
+                    console.log(`Versuche Fallback URL: ${feed.fallbackUrl}`);
+                    const result = await fetchFeed(feed.fallbackUrl);
+                    console.log('✓ Fallback URL erfolgreich');
+                    return result;
+                } catch (error) {
+                    console.warn(`Fallback URL fehlgeschlagen: ${error.message}`);
+                    lastError = error;
+                }
+            }
+
+            throw lastError || new Error('Beide Feed-URLs fehlgeschlagen');
+        }
+
+        async function fetchFeed(url) {
+            let lastError = null;
+
+            // Versuche jeden Proxy der Reihe nach
+            for (let i = 0; i < CORS_PROXIES.length; i++) {
+                const proxy = CORS_PROXIES[i];
+                try {
+                    console.log(`Versuche Proxy ${i + 1}/${CORS_PROXIES.length}: ${proxy.substring(0, 30)}...`);
+
+                    const response = await fetch(proxy + encodeURIComponent(url), {
+                        signal: AbortSignal.timeout(10000) // 10 Sekunden Timeout
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+
+                    const text = await response.text();
+
+                    // Prüfen ob wir wirklich XML bekommen haben
+                    if (!text.trim().startsWith('<')) {
+                        throw new Error('Keine gültige XML-Antwort');
+                    }
+
+                    const parser = new DOMParser();
+                    const xml = parser.parseFromString(text, 'text/xml');
+
+                    // Prüfen auf Parser-Fehler
+                    const parserError = xml.querySelector('parsererror');
+                    if (parserError) {
+                        console.error('XML Parser Fehler:', parserError.textContent);
+                        throw new Error('XML-Format ungültig');
+                    }
+
+                    // Prüfen ob RSS oder Atom
+                    const isRSS = xml.querySelector('rss, rdf\\:RDF');
+                    const isAtom = xml.querySelector('feed');
+
+                    console.log(`✓ Proxy ${i + 1} erfolgreich! Feed-Typ:`, isRSS ? 'RSS' : isAtom ? 'Atom' : 'Unbekannt');
+
+                    if (isRSS) {
+                        return parseRSS(xml);
+                    } else if (isAtom) {
+                        return parseAtom(xml);
+                    } else {
+                        // Debug-Ausgabe
+                        console.error('Unbekanntes Feed-Format. Root-Element:', xml.documentElement?.tagName);
+                        console.error('XML-Inhalt (erste 500 Zeichen):', text.substring(0, 500));
+                        throw new Error('Feed-Format nicht erkannt');
+                    }
+                } catch (error) {
+                    console.warn(`✗ Proxy ${i + 1} fehlgeschlagen:`, error.message);
+                    lastError = error;
+                    // Nächsten Proxy versuchen
+                }
+            }
+
+            // Alle Proxies fehlgeschlagen
+            console.error('❌ Alle CORS-Proxies fehlgeschlagen für:', url);
+            throw new Error(`Alle Proxies fehlgeschlagen. Letzter Fehler: ${lastError?.message || 'Unbekannt'}`);
+        }
+
+        function parseRSS(xml) {
+            // Versuche verschiedene Selektoren für RSS-Items
+            let items = xml.querySelectorAll('item');
+
+            // Falls keine Items gefunden, versuche channel > item
+            if (items.length === 0) {
+                items = xml.querySelectorAll('channel > item');
+            }
+
+            // RDF-Feeds
+            if (items.length === 0) {
+                items = xml.querySelectorAll('rdf\\:RDF > item, item');
+            }
+
+            console.log(`RSS: ${items.length} Artikel gefunden`);
+
+            const articles = [];
+
+            items.forEach((item, index) => {
+                if (index < 10) { // Maximal 10 Artikel pro Feed
+                    const link = item.querySelector('link')?.textContent?.trim() ||
+                                item.querySelector('guid')?.textContent?.trim() || '#';
+
+                    articles.push({
+                        title: item.querySelector('title')?.textContent?.trim() || 'Kein Titel',
+                        link: link,
+                        description: cleanDescription(
+                            item.querySelector('description')?.textContent ||
+                            item.querySelector('content\\:encoded')?.textContent ||
+                            ''
+                        ),
+                        pubDate: item.querySelector('pubDate')?.textContent ||
+                                item.querySelector('dc\\:date')?.textContent || ''
+                    });
+                }
+            });
+
+            return articles;
+        }
+
+        function parseAtom(xml) {
+            const entries = xml.querySelectorAll('entry');
+            console.log(`Atom: ${entries.length} Artikel gefunden`);
+
+            const articles = [];
+
+            entries.forEach((entry, index) => {
+                if (index < 10) { // Maximal 10 Artikel pro Feed
+                    const link = entry.querySelector('link');
+                    const linkHref = link?.getAttribute('href') || link?.textContent?.trim() || '#';
+
+                    articles.push({
+                        title: entry.querySelector('title')?.textContent?.trim() || 'Kein Titel',
+                        link: linkHref,
+                        description: cleanDescription(
+                            entry.querySelector('summary')?.textContent ||
+                            entry.querySelector('content')?.textContent ||
+                            ''
+                        ),
+                        pubDate: entry.querySelector('published')?.textContent ||
+                                entry.querySelector('updated')?.textContent || ''
+                    });
+                }
+            });
+
+            return articles;
+        }
+
+        function cleanDescription(desc) {
+            // HTML-Tags entfernen und auf 200 Zeichen kürzen
+            const temp = document.createElement('div');
+            temp.innerHTML = desc;
+            const text = temp.textContent || temp.innerText || '';
+            return text.length > 200 ? text.substring(0, 200) + '...' : text;
+        }
+
+        function formatDate(dateString) {
+            if (!dateString) return '';
+            try {
+                const date = new Date(dateString);
+                const now = new Date();
+                const diffMs = now - date;
+                const diffMins = Math.floor(diffMs / 60000);
+                const diffHours = Math.floor(diffMs / 3600000);
+                const diffDays = Math.floor(diffMs / 86400000);
+
+                if (diffMins < 60) {
+                    return `vor ${diffMins} Min.`;
+                } else if (diffHours < 24) {
+                    return `vor ${diffHours} Std.`;
+                } else if (diffDays < 7) {
+                    return `vor ${diffDays} Tag${diffDays > 1 ? 'en' : ''}`;
+                } else {
+                    return date.toLocaleDateString('de-DE');
+                }
+            } catch (e) {
+                return '';
+            }
+        }
+
+        // UI-Funktionen
+        function openAddFeedModal() {
+            document.getElementById('addFeedModal').classList.add('active');
+        }
+
+        function closeAddFeedModal() {
+            document.getElementById('addFeedModal').classList.remove('active');
+            document.getElementById('feedName').value = '';
+            document.getElementById('feedUrl').value = '';
+            document.getElementById('feedFallbackUrl').value = '';
+        }
+
+        function openEditFeedModal(feedId) {
+            const feed = feedManager.getFeed(feedId);
+            if (!feed) return;
+
+            document.getElementById('editFeedId').value = feed.id;
+            document.getElementById('editFeedName').value = feed.name;
+            document.getElementById('editFeedUrl').value = feed.url;
+            document.getElementById('editFeedFallbackUrl').value = feed.fallbackUrl || '';
+            document.getElementById('editFeedModal').classList.add('active');
+        }
+
+        function closeEditFeedModal() {
+            document.getElementById('editFeedModal').classList.remove('active');
+        }
+
+        async function addFeed(event) {
+            event.preventDefault();
+
+            const name = document.getElementById('feedName').value;
+            const url = document.getElementById('feedUrl').value;
+            const fallbackUrl = document.getElementById('feedFallbackUrl').value;
+
+            const feed = feedManager.addFeed(name, url, fallbackUrl);
+            closeAddFeedModal();
+
+            await renderFeeds();
+        }
+
+        async function updateFeed(event) {
+            event.preventDefault();
+
+            const id = document.getElementById('editFeedId').value;
+            const name = document.getElementById('editFeedName').value;
+            const url = document.getElementById('editFeedUrl').value;
+            const fallbackUrl = document.getElementById('editFeedFallbackUrl').value;
+
+            feedManager.updateFeed(id, name, url, fallbackUrl);
+            closeEditFeedModal();
+
+            await renderFeeds();
+        }
+
+        function removeFeed(id) {
+            if (confirm('Möchtest du diesen Feed wirklich löschen?')) {
+                feedManager.removeFeed(id);
+                renderFeeds();
+            }
+        }
+
+        async function renderFeeds() {
+            const container = document.getElementById('feedsGrid');
+            const feeds = feedManager.getAllFeeds();
+
+            // Artikel-Sammlung zurücksetzen
+            allArticles = [];
+
+            // Sidebar aktualisieren
+            renderSidebar();
+
+            // Nur aktive Feeds anzeigen
+            const activeFeeds = feeds.filter(f => f.active);
+
+            if (feeds.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">📭</div>
+                        <h2>Keine Feeds vorhanden</h2>
+                        <p>Füge deinen ersten RSS-Feed hinzu, um loszulegen!</p>
+                    </div>
+                `;
+                return;
+            }
+
+            if (activeFeeds.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">👁️</div>
+                        <h2>Alle Feeds sind ausgeblendet</h2>
+                        <p>Aktiviere Feeds in der Sidebar, um sie anzuzeigen.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = '';
+
+            for (const feed of activeFeeds) {
+                const card = createFeedCard(feed);
+                container.appendChild(card);
+                loadFeedContent(feed);
+            }
+        }
+
+        function renderSidebar() {
+            const sidebarList = document.getElementById('sidebarFeedList');
+            const feeds = feedManager.getAllFeeds();
+
+            if (feeds.length === 0) {
+                sidebarList.innerHTML = '<li style="padding: 20px; text-align: center; color: #95a5a6;">Keine Feeds</li>';
+                return;
+            }
+
+            sidebarList.innerHTML = feeds.map(feed => `
+                <li class="sidebar-feed-item ${feed.active ? '' : 'disabled'}"
+                    draggable="true"
+                    data-feed-id="${feed.id}">
+                    <span class="drag-handle" title="Ziehen zum Sortieren">☰</span>
+                    <div class="feed-name-clickable" onclick="scrollToFeed('${feed.id}')" title="${feed.name}">
+                        ${feed.name}
+                    </div>
+                    <div class="toggle-switch ${feed.active ? 'active' : ''}"
+                         onclick="event.stopPropagation(); toggleFeedActive('${feed.id}')">
+                    </div>
+                </li>
+            `).join('');
+
+            // Drag & Drop Event Listener hinzufügen
+            setupDragAndDrop();
+        }
+
+        // Drag & Drop Funktionalität
+        let draggedElement = null;
+        let draggedIndex = null;
+
+        function setupDragAndDrop() {
+            const feedItems = document.querySelectorAll('.sidebar-feed-item');
+
+            feedItems.forEach((item, index) => {
+                // Nur bei Drag-Handle starten
+                const dragHandle = item.querySelector('.drag-handle');
+
+                dragHandle.addEventListener('mousedown', function() {
+                    item.draggable = true;
+                });
+
+                item.addEventListener('dragstart', function(e) {
+                    draggedElement = item;
+                    draggedIndex = index;
+                    item.classList.add('dragging');
+                    e.dataTransfer.effectAllowed = 'move';
+                    e.dataTransfer.setData('text/html', item.innerHTML);
+                });
+
+                item.addEventListener('dragend', function(e) {
+                    item.classList.remove('dragging');
+                    item.draggable = false;
+
+                    // Alle drag-over Klassen entfernen
+                    feedItems.forEach(i => i.classList.remove('drag-over'));
+
+                    draggedElement = null;
+                    draggedIndex = null;
+                });
+
+                item.addEventListener('dragover', function(e) {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = 'move';
+
+                    if (draggedElement && draggedElement !== item) {
+                        item.classList.add('drag-over');
+                    }
+                });
+
+                item.addEventListener('dragleave', function(e) {
+                    item.classList.remove('drag-over');
+                });
+
+                item.addEventListener('drop', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+
+                    item.classList.remove('drag-over');
+
+                    if (draggedElement && draggedElement !== item) {
+                        const dropIndex = index;
+
+                        // Feed-Reihenfolge ändern
+                        feedManager.reorderFeeds(draggedIndex, dropIndex);
+
+                        // UI aktualisieren
+                        renderSidebar();
+
+                        // Feed-Grid neu rendern (nur wenn sich die Anzeige ändert)
+                        const activeFeeds = feedManager.getAllFeeds().filter(f => f.active);
+                        if (activeFeeds.length > 0) {
+                            renderFeedsGrid();
+                        }
+                    }
+                });
+            });
+        }
+
+        function renderFeedsGrid() {
+            const container = document.getElementById('feedsGrid');
+            const feeds = feedManager.getAllFeeds();
+            const activeFeeds = feeds.filter(f => f.active);
+
+            if (activeFeeds.length === 0) return;
+
+            container.innerHTML = '';
+
+            for (const feed of activeFeeds) {
+                const card = createFeedCard(feed);
+                container.appendChild(card);
+                loadFeedContent(feed);
+            }
+        }
+
+        function scrollToFeed(feedId) {
+            const feed = feedManager.getFeed(feedId);
+
+            // Wenn Feed deaktiviert ist, erst aktivieren
+            if (feed && !feed.active) {
+                toggleFeedActive(feedId);
+                // Kurz warten bis Feed gerendert ist, dann scrollen
+                setTimeout(() => {
+                    const feedCard = document.getElementById(`feed-${feedId}`);
+                    if (feedCard) {
+                        feedCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }
+                }, 100);
+            } else {
+                const feedCard = document.getElementById(`feed-${feedId}`);
+                if (feedCard) {
+                    feedCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            }
+        }
+
+        function toggleFeedActive(feedId) {
+            const feed = feedManager.toggleFeedActive(feedId);
+            if (feed) {
+                if (feed.active) {
+                    // Feed aktiviert - hinzufügen und laden
+                    const container = document.getElementById('feedsGrid');
+                    const feeds = feedManager.getAllFeeds();
+                    const activeFeeds = feeds.filter(f => f.active);
+
+                    // Prüfen ob andere aktive Feeds existieren
+                    if (activeFeeds.length === 1) {
+                        // Das ist der einzige aktive Feed, Container leeren und neu aufbauen
+                        container.innerHTML = '';
+                    }
+
+                    // Feed-Card erstellen und hinzufügen
+                    const card = createFeedCard(feed);
+
+                    // Richtige Position finden (nach Feed-Reihenfolge)
+                    const feedIndex = feeds.findIndex(f => f.id === feedId);
+                    const previousActiveFeeds = feeds.slice(0, feedIndex).filter(f => f.active);
+
+                    if (previousActiveFeeds.length === 0) {
+                        container.insertBefore(card, container.firstChild);
+                    } else {
+                        const lastPreviousFeedId = previousActiveFeeds[previousActiveFeeds.length - 1].id;
+                        const lastPreviousCard = document.getElementById(`feed-${lastPreviousFeedId}`);
+                        if (lastPreviousCard && lastPreviousCard.nextSibling) {
+                            container.insertBefore(card, lastPreviousCard.nextSibling);
+                        } else {
+                            container.appendChild(card);
+                        }
+                    }
+
+                    loadFeedContent(feed);
+                } else {
+                    // Feed deaktiviert - entfernen
+                    const card = document.getElementById(`feed-${feedId}`);
+                    if (card) {
+                        card.remove();
+                    }
+
+                    // Prüfen ob keine aktiven Feeds mehr existieren
+                    const feeds = feedManager.getAllFeeds();
+                    const activeFeeds = feeds.filter(f => f.active);
+                    if (activeFeeds.length === 0) {
+                        const container = document.getElementById('feedsGrid');
+                        container.innerHTML = `
+                            <div class="empty-state">
+                                <div class="empty-state-icon">👁️</div>
+                                <h2>Alle Feeds sind ausgeblendet</h2>
+                                <p>Aktiviere Feeds in der Sidebar, um sie anzuzeigen.</p>
+                            </div>
+                        `;
+                    }
+                }
+                renderSidebar();
+            }
+        }
+
+        function toggleMobileMenu() {
+            document.getElementById('sidebar').classList.toggle('mobile-open');
+        }
+
+        function createFeedCard(feed) {
+            const card = document.createElement('div');
+            card.className = 'feed-card';
+            card.id = `feed-${feed.id}`;
+
+            const urlInfo = feed.fallbackUrl ?
+                `<div class="feed-url-info">Mit Fallback-URL</div>` : '';
+
+            card.innerHTML = `
+                <div class="feed-header">
+                    <div>
+                        <div class="feed-title">${feed.name}</div>
+                        ${urlInfo}
+                    </div>
+                    <div class="feed-actions">
+                        <button class="edit" onclick="openEditFeedModal('${feed.id}')">✎</button>
+                        <button class="danger" onclick="removeFeed('${feed.id}')">✕</button>
+                    </div>
+                </div>
+                <div class="feed-content">
+                    <div class="loading">
+                        <div class="spinner"></div>
+                        Lade Artikel...
+                    </div>
+                </div>
+            `;
+
+            return card;
+        }
+
+        async function loadFeedContent(feed) {
+            const contentDiv = document.querySelector(`#feed-${feed.id} .feed-content`);
+
+            try {
+                const articles = await fetchFeedWithFallback(feed);
+
+                if (articles.length === 0) {
+                    contentDiv.innerHTML = '<div class="loading">Keine Artikel gefunden</div>';
+                    return;
+                }
+
+                // Artikel zur globalen Sammlung hinzufügen (mit Feed-Info)
+                articles.forEach(article => {
+                    allArticles.push({
+                        ...article,
+                        feedId: feed.id,
+                        feedName: feed.name
+                    });
+                });
+
+                contentDiv.innerHTML = articles.map(article => `
+                    <div class="article">
+                        <div class="article-title">
+                            <a href="${article.link}" target="_blank" rel="noopener noreferrer">
+                                ${article.title}
+                            </a>
+                        </div>
+                        ${article.pubDate ? `<div class="article-meta">${formatDate(article.pubDate)}</div>` : ''}
+                        ${article.description ? `<div class="article-description">${article.description}</div>` : ''}
+                    </div>
+                `).join('');
+
+            } catch (error) {
+                console.error(`Feed ${feed.name} konnte nicht geladen werden:`, error);
+                contentDiv.innerHTML = `
+                    <div class="error">
+                        <strong>Fehler beim Laden</strong><br>
+                        ${error.message}<br>
+                        <small style="margin-top: 8px; display: block;">Überprüfe die Feed-URLs oder versuche es später erneut.</small>
+                    </div>
+                `;
+            }
+        }
+
+        async function refreshAllFeeds() {
+            const feeds = feedManager.getAllFeeds();
+
+            // Artikel-Sammlung zurücksetzen
+            allArticles = [];
+
+            for (const feed of feeds) {
+                const contentDiv = document.querySelector(`#feed-${feed.id} .feed-content`);
+                if (contentDiv) {
+                    contentDiv.innerHTML = '<div class="loading"><div class="spinner"></div>Aktualisiere...</div>';
+                    await loadFeedContent(feed);
+                }
+            }
+
+            // Falls Suche aktiv ist, erneut suchen
+            if (isSearchActive) {
+                performSearch();
+            }
+        }
+
+        // Suchfunktionen
+        function handleSearchInput(event) {
+            const searchTerm = event.target.value.trim();
+
+            // Bei Enter-Taste suchen
+            if (event.key === 'Enter' && searchTerm.length >= 2) {
+                performSearch();
+            }
+
+            // Bei leerem Suchfeld automatisch zurücksetzen
+            if (searchTerm.length === 0 && isSearchActive) {
+                clearSearch();
+            }
+        }
+
+        function performSearch() {
+            const searchTerm = document.getElementById('searchInput').value.trim().toLowerCase();
+
+            if (searchTerm.length < 2) {
+                alert('Bitte mindestens 2 Zeichen eingeben');
+                return;
+            }
+
+            // Artikel durchsuchen
+            const results = allArticles.filter(article => {
+                const titleMatch = article.title.toLowerCase().includes(searchTerm);
+                const descMatch = article.description.toLowerCase().includes(searchTerm);
+                return titleMatch || descMatch;
+            });
+
+            // Suchergebnisse anzeigen
+            renderSearchResults(results, searchTerm);
+            isSearchActive = true;
+
+            // Clear-Button anzeigen
+            document.getElementById('clearSearchBtn').style.display = 'flex';
+        }
+
+        function renderSearchResults(results, searchTerm) {
+            const container = document.getElementById('feedsGrid');
+
+            if (results.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">🔍</div>
+                        <h2>Keine Ergebnisse gefunden</h2>
+                        <p>Keine Artikel für "${searchTerm}" gefunden.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = `
+                <div class="search-results-container">
+                    <div class="search-results-header">
+                        <div class="search-results-title">🔍 Suchergebnisse für "${searchTerm}"</div>
+                        <div class="search-results-count">${results.length} ${results.length === 1 ? 'Artikel' : 'Artikel'} gefunden</div>
+                    </div>
+                    <div class="search-results-list">
+                        ${results.map(article => `
+                            <div class="search-result-item">
+                                <div class="search-result-feed">${article.feedName}</div>
+                                <div class="article-title">
+                                    <a href="${article.link}" target="_blank" rel="noopener noreferrer">
+                                        ${highlightSearchTerm(article.title, searchTerm)}
+                                    </a>
+                                </div>
+                                ${article.pubDate ? `<div class="article-meta">${formatDate(article.pubDate)}</div>` : ''}
+                                ${article.description ? `<div class="article-description">${highlightSearchTerm(article.description, searchTerm)}</div>` : ''}
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        }
+
+        function highlightSearchTerm(text, searchTerm) {
+            if (!searchTerm) return text;
+
+            const regex = new RegExp(`(${escapeRegex(searchTerm)})`, 'gi');
+            return text.replace(regex, '<span class="search-highlight">$1</span>');
+        }
+
+        function escapeRegex(string) {
+            return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        }
+
+        function clearSearch() {
+            // Suchfeld leeren
+            document.getElementById('searchInput').value = '';
+            isSearchActive = false;
+
+            // Clear-Button verstecken
+            document.getElementById('clearSearchBtn').style.display = 'none';
+
+            // Normale Feed-Ansicht wiederherstellen
+            renderFeeds();
+        }
+
+        // Modal schließen bei Klick außerhalb
+        document.getElementById('addFeedModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeAddFeedModal();
+            }
+        });
+
+        document.getElementById('editFeedModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeEditFeedModal();
+            }
+        });
+
+        // Initial laden
+        document.addEventListener('DOMContentLoaded', () => {
+            renderFeeds();
+        });
+    </script>
+</body>
+</html>
