@@ -4,11 +4,11 @@
 
 Dieses Workspace enthält einen RSS Feed Reader in zwei Varianten:
 
-| Datei/Verzeichnis | Beschreibung |
-|---|---|
-| `rss-reader.html` | Original-Version: Vanilla HTML + JavaScript |
-| `rss-reader-vue.html` | Vue 3 via CDN (Single-File) |
-| `rss-reader-vue-project/` | Vue 3 + Vite (vollständiges Projekt) |
+| Datei/Verzeichnis         | Beschreibung                                |
+| ------------------------- | ------------------------------------------- |
+| `rss-reader.html`         | Original-Version: Vanilla HTML + JavaScript |
+| `rss-reader-vue.html`     | Vue 3 via CDN (Single-File)                 |
+| `rss-reader-vue-project/` | Vue 3 + Vite (vollständiges Projekt)        |
 
 ## Vue CDN Version (`rss-reader-vue.html`)
 
@@ -46,15 +46,19 @@ src/
 ## Architektur-Entscheidungen
 
 ### Robustes Daten-Loading
+
 Alte Artikel bleiben sichtbar, bis neue erfolgreich von der API geliefert wurden.
 In `useFeedManager.js → loadFeedContent()`:
+
 - `feedLoading[id]` zeigt Lade-Spinner (ohne alte Daten zu löschen)
 - `feedArticles[id]` wird **nur bei Erfolg** überschrieben
 - `feedErrors[id]` wird nur bei Fehler gesetzt
 
 ### CORS-Proxy Fallback
+
 Feeds werden über externe CORS-Proxies geladen (Browser-Einschränkung).
 Reihenfolge in `CORS_PROXIES`:
+
 1. `api.allorigins.win`
 2. `corsproxy.io`
 3. `api.codetabs.com`
@@ -63,25 +67,33 @@ Reihenfolge in `CORS_PROXIES`:
 Zusätzlich: JSON-Fallback über `rss2json`, falls XML-Proxies fehlschlagen.
 
 ### Kategorien aus Feed-Inhalten
+
 - Pro Artikel werden Kategorien direkt aus Feed-Metadaten geholt.
 - Quellen:
+
 1. RSS: `<category>`, `<dc:subject>`
 2. Atom: `<category term|label>`
 3. rss2json: `categories`, `tags`
+
 - Ergebnis: `article.categories` wird in der UI für Filterung und Darstellung genutzt.
 
 ### Sidebar-Navigation
+
 - Sidebar ist in drei Reiter aufgeteilt:
+
 1. `Filter`: Region, Profil, Thema, erkannte Kategorien, Top-Links
 2. `Feeds`: konkrete Feed-Liste inkl. Drag & Drop / Aktiv-Status
 3. `Verwalten`: Feed hinzufügen, Vorschlags-Feeds importieren
+
 - Aktiver Reiter wird in `localStorage` persistiert.
 
 ### LocalStorage
+
 - CDN-Version: Key `rss-feeds-vue`
 - Projekt-Version: Key `rss-feeds-vue` (gleicher Key → gleiche Daten)
 
 ### Vue 3 Spezifika
+
 - Composition API mit `<script setup>` in allen Komponenten
 - Kein `v-if` und `v-for` auf demselben Element (v-if hat höhere Priorität)
 - Aktive Feeds über `computed: activeFeeds` filtern, nicht per `v-if` im `v-for`
@@ -89,6 +101,7 @@ Zusätzlich: JSON-Fallback über `rss2json`, falls XML-Proxies fehlschlagen.
 ## Feed-Formate
 
 Beide RSS und Atom werden unterstützt:
+
 - **RSS**: `<item>` Elemente, `<pubDate>`, `<description>`
 - **Atom**: `<entry>` Elemente, `<published>`, `<summary>`
 
