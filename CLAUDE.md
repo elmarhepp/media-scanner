@@ -35,7 +35,7 @@ src/
 ├── style.css                  # Globale Styles
 ├── components/
 │   ├── FeedCard.vue           # Feed-Karte mit Artikeln
-│   ├── FeedSidebar.vue        # Sidebar mit Feed-Liste + Drag & Drop
+│   ├── FeedSidebar.vue        # Sidebar mit Reitern (Filter/Feeds/Verwalten)
 │   ├── AddFeedModal.vue       # Modal: Feed hinzufügen
 │   ├── EditFeedModal.vue      # Modal: Feed bearbeiten
 │   └── SearchResults.vue      # Suchergebnisse-Ansicht
@@ -60,6 +60,23 @@ Reihenfolge in `CORS_PROXIES`:
 3. `api.codetabs.com`
 4. `cors-anywhere.herokuapp.com`
 
+Zusätzlich: JSON-Fallback über `rss2json`, falls XML-Proxies fehlschlagen.
+
+### Kategorien aus Feed-Inhalten
+- Pro Artikel werden Kategorien direkt aus Feed-Metadaten geholt.
+- Quellen:
+1. RSS: `<category>`, `<dc:subject>`
+2. Atom: `<category term|label>`
+3. rss2json: `categories`, `tags`
+- Ergebnis: `article.categories` wird in der UI für Filterung und Darstellung genutzt.
+
+### Sidebar-Navigation
+- Sidebar ist in drei Reiter aufgeteilt:
+1. `Filter`: Region, Profil, Thema, erkannte Kategorien, Top-Links
+2. `Feeds`: konkrete Feed-Liste inkl. Drag & Drop / Aktiv-Status
+3. `Verwalten`: Feed hinzufügen, Vorschlags-Feeds importieren
+- Aktiver Reiter wird in `localStorage` persistiert.
+
 ### LocalStorage
 - CDN-Version: Key `rss-feeds-vue`
 - Projekt-Version: Key `rss-feeds-vue` (gleicher Key → gleiche Daten)
@@ -80,3 +97,8 @@ Beide RSS und Atom werden unterstützt:
 - CORS-Proxies können langsam oder temporär nicht erreichbar sein
 - Feeds werden direkt im Browser geparst (kein Backend)
 - Maximal 10 Artikel pro Feed
+
+## Deployment
+
+- Railway-Konfiguration liegt in `rss-reader-vue-project/railway.json`.
+- Deploy via `railway up` (im Projektordner), URL via `railway domain`.
