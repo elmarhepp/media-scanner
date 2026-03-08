@@ -2,16 +2,26 @@
   <div class="app-wrapper">
     <FeedSidebar
       :class="{ 'mobile-open': mobileMenuOpen }"
-      :feeds="feeds"
-      :draggedIndex="draggedIndex"
-      :dragOverIndex="dragOverIndex"
+      :feeds="filteredFeeds"
+      :selectedRegion="selectedRegion"
+      :selectedProfile="selectedProfile"
+      :selectedTopic="selectedTopic"
+      :regionCounts="regionCounts"
+      :profileCounts="profileCounts"
+      :topicCounts="topicCounts"
+      :draggedFeedId="draggedFeedId"
+      :dragOverFeedId="dragOverFeedId"
       @open-add-modal="showAddModal = true"
+      @import-recommended="handleImportRecommended"
+      @set-region="selectedRegion = $event"
+      @set-profile="selectedProfile = $event"
+      @set-topic="selectedTopic = $event"
       @toggle-feed="toggleFeedActive"
       @scroll-to-feed="scrollToFeed"
       @start-drag="startDrag"
       @end-drag="endDrag"
-      @drag-over="dragOverIndex = $event"
-      @drag-leave="dragOverIndex = null"
+      @drag-over="dragOverFeedId = $event"
+      @drag-leave="dragOverFeedId = null"
       @drop="dropFeed"
     />
 
@@ -69,14 +79,19 @@
             <h2>Keine Feeds vorhanden</h2>
             <p>Füge deinen ersten RSS-Feed hinzu, um loszulegen!</p>
           </div>
-          <div v-else-if="activeFeedCount === 0" class="empty-state">
+          <div v-else-if="filteredFeeds.length === 0" class="empty-state">
+            <div class="empty-state-icon">🧭</div>
+            <h2>Keine Feeds in dieser Gruppe</h2>
+            <p>Ändere Region, Profil oder Themen-Filter in der Sidebar.</p>
+          </div>
+          <div v-else-if="filteredActiveFeeds.length === 0" class="empty-state">
             <div class="empty-state-icon">👁️</div>
-            <h2>Alle Feeds sind ausgeblendet</h2>
+            <h2>Alle gefilterten Feeds sind ausgeblendet</h2>
             <p>Aktiviere Feeds in der Sidebar, um sie anzuzeigen.</p>
           </div>
           <template v-else>
             <FeedCard
-              v-for="feed in activeFeeds"
+              v-for="feed in filteredActiveFeeds"
               :key="feed.id"
               :feed="feed"
               :articles="feedArticles[feed.id]"
@@ -107,7 +122,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from "vue";
+import { ref, computed, onMounted } from "vue";
 import { useFeedManager } from "./composables/useFeedManager";
 import FeedSidebar from "./components/FeedSidebar.vue";
 import FeedCard from "./components/FeedCard.vue";
@@ -121,8 +136,6 @@ const {
   feedLoading,
   feedErrors,
   allArticles,
-  activeFeeds,
-  activeFeedCount,
   loadFeeds,
   addFeed,
   updateFeed,
@@ -130,6 +143,7 @@ const {
   toggleFeedActive,
   reorderFeeds,
   getFeed,
+  importRecommendedFeeds,
   loadFeedContent,
   formatDate,
   refreshAllFeeds,
@@ -140,9 +154,68 @@ const showAddModal = ref(false);
 const showEditModal = ref(false);
 const editingFeed = ref({});
 const mobileMenuOpen = ref(false);
-const draggedIndex = ref(null);
-const dragOverIndex = ref(null);
+const draggedFeedId = ref(null);
+const dragOverFeedId = ref(null);
 const isRefreshing = ref(false);
+
+// Navigation / Grouping
+const selectedRegion = ref("de");
+const selectedProfile = ref("all");
+const selectedTopic = ref("all");
+
+const filteredFeeds = computed(() =>
+  feeds.value.filter((feed) => {
+    if (!feed) return false;
+    const regionMatch = feed.region === selectedRegion.value;
+    const profileMatch =
+      selectedProfile.value === "all" || feed.profile === selectedProfile.value;
+    const topicMatch =
+      selectedTopic.value === "all" ||
+      (Array.isArray(feed.topics) && feed.topics.includes(selectedTopic.value));
+    return regionMatch && profileMatch && topicMatch;
+  }),
+);
+
+const filteredActiveFeeds = computed(() =>
+  filteredFeeds.value.filter((feed) => feed.active),
+);
+
+const regionCounts = computed(() => ({
+  de: feeds.value.filter((feed) => feed?.region === "de").length,
+  intl: feeds.value.filter((feed) => feed?.region === "intl").length,
+}));
+
+const profileCounts = computed(() => {
+  const inRegion = feeds.value.filter(
+    (feed) => feed?.region === selectedRegion.value,
+  );
+  return {
+    all: inRegion.length,
+    mainstream: inRegion.filter((feed) => feed?.profile === "mainstream")
+      .length,
+    alternative: inRegion.filter((feed) => feed?.profile === "alternative")
+      .length,
+  };
+});
+
+const topicCounts = computed(() => {
+  const base = feeds.value.filter((feed) => {
+    if (feed?.region !== selectedRegion.value) return false;
+    if (
+      selectedProfile.value !== "all" &&
+      feed?.profile !== selectedProfile.value
+    ) {
+      return false;
+    }
+    return true;
+  });
+
+  return {
+    all: base.length,
+    politics: base.filter((feed) => feed?.topics?.includes("politics")).length,
+    general: base.filter((feed) => feed?.topics?.includes("general")).length,
+  };
+});
 
 // Search
 const searchTerm = ref("");
@@ -150,14 +223,29 @@ const isSearchActive = ref(false);
 const searchResults = ref([]);
 
 // Feed Management
-const handleAddFeed = async ({ name, url, fallbackUrl }) => {
-  const feed = addFeed(name, url, fallbackUrl);
+const handleAddFeed = async ({
+  name,
+  url,
+  fallbackUrl,
+  region,
+  profile,
+  topics,
+}) => {
+  const feed = addFeed(name, url, fallbackUrl, region, profile, topics);
   showAddModal.value = false;
   await loadFeedContent(feed);
 };
 
-const handleUpdateFeed = async ({ id, name, url, fallbackUrl }) => {
-  const feed = updateFeed(id, name, url, fallbackUrl);
+const handleUpdateFeed = async ({
+  id,
+  name,
+  url,
+  fallbackUrl,
+  region,
+  profile,
+  topics,
+}) => {
+  const feed = updateFeed(id, name, url, fallbackUrl, region, profile, topics);
   showEditModal.value = false;
   if (feed) {
     await loadFeedContent(feed);
@@ -206,22 +294,50 @@ const handleRefreshAll = async () => {
   isRefreshing.value = false;
 };
 
+const handleImportRecommended = async () => {
+  const createdFeeds = importRecommendedFeeds();
+  if (createdFeeds.length === 0) {
+    alert("Alle Vorschlags-Feeds sind bereits vorhanden.");
+    return;
+  }
+
+  isRefreshing.value = true;
+  try {
+    await Promise.all(createdFeeds.map((feed) => loadFeedContent(feed)));
+  } finally {
+    isRefreshing.value = false;
+  }
+
+  alert(`${createdFeeds.length} Vorschlags-Feeds wurden hinzugefuegt.`);
+};
+
 // Drag & Drop
-const startDrag = (index, event) => {
-  draggedIndex.value = index;
+const startDrag = (feedId, event) => {
+  draggedFeedId.value = feedId;
   event.dataTransfer.effectAllowed = "move";
 };
 
 const endDrag = () => {
-  draggedIndex.value = null;
-  dragOverIndex.value = null;
+  draggedFeedId.value = null;
+  dragOverFeedId.value = null;
 };
 
-const dropFeed = (index) => {
-  if (draggedIndex.value !== null && draggedIndex.value !== index) {
-    reorderFeeds(draggedIndex.value, index);
+const dropFeed = (targetFeedId) => {
+  if (!draggedFeedId.value || draggedFeedId.value === targetFeedId) {
+    dragOverFeedId.value = null;
+    return;
   }
-  dragOverIndex.value = null;
+
+  const fromIndex = feeds.value.findIndex(
+    (feed) => feed.id === draggedFeedId.value,
+  );
+  const toIndex = feeds.value.findIndex((feed) => feed.id === targetFeedId);
+
+  if (fromIndex !== -1 && toIndex !== -1 && fromIndex !== toIndex) {
+    reorderFeeds(fromIndex, toIndex);
+  }
+
+  dragOverFeedId.value = null;
 };
 
 // Search
@@ -238,7 +354,11 @@ const performSearch = () => {
   }
 
   const searchLower = searchTerm.value.toLowerCase();
+  const allowedFeedIds = new Set(filteredFeeds.value.map((feed) => feed.id));
   searchResults.value = allArticles.value.filter((article) => {
+    if (!allowedFeedIds.has(article.feedId)) {
+      return false;
+    }
     const titleMatch = article.title.toLowerCase().includes(searchLower);
     const descMatch = article.description.toLowerCase().includes(searchLower);
     return titleMatch || descMatch;

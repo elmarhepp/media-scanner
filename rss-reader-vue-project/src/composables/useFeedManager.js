@@ -6,6 +6,148 @@ const CORS_PROXIES = [
   "https://api.allorigins.win/raw?url=",
 ];
 const RSS2JSON_ENDPOINT = "https://api.rss2json.com/v1/api.json?rss_url=";
+const RECOMMENDED_FEEDS = [
+  {
+    name: "Tagesschau",
+    url: "https://www.tagesschau.de/xml/rss2",
+    region: "de",
+    profile: "mainstream",
+    topics: ["general", "politics"],
+  },
+  {
+    name: "Deutschlandfunk Nachrichten",
+    url: "https://www.deutschlandfunk.de/nachrichten-100.rss",
+    region: "de",
+    profile: "mainstream",
+    topics: ["general", "politics"],
+  },
+  {
+    name: "ZEIT ONLINE",
+    url: "https://newsfeed.zeit.de/index",
+    region: "de",
+    profile: "mainstream",
+    topics: ["general", "politics"],
+  },
+  {
+    name: "FAZ Politik",
+    url: "https://www.faz.net/rss/aktuell/politik/",
+    region: "de",
+    profile: "mainstream",
+    topics: ["politics"],
+  },
+  {
+    name: "Sueddeutsche Politik",
+    url: "https://rss.sueddeutsche.de/rss/Politik",
+    region: "de",
+    profile: "mainstream",
+    topics: ["politics"],
+  },
+  {
+    name: "Der Spiegel Politik",
+    url: "https://www.spiegel.de/politik/index.rss",
+    region: "de",
+    profile: "mainstream",
+    topics: ["politics"],
+  },
+  {
+    name: "NachDenkSeiten",
+    url: "https://www.nachdenkseiten.de/?feed=rss2",
+    region: "de",
+    profile: "alternative",
+    topics: ["politics", "general"],
+  },
+  {
+    name: "Telepolis",
+    url: "https://www.telepolis.de/rss.xml",
+    region: "de",
+    profile: "alternative",
+    topics: ["politics", "general"],
+  },
+  {
+    name: "Cicero",
+    url: "https://www.cicero.de/rss",
+    region: "de",
+    profile: "alternative",
+    topics: ["politics", "general"],
+  },
+  {
+    name: "nd aktuell",
+    url: "https://www.nd-aktuell.de/rss",
+    region: "de",
+    profile: "alternative",
+    topics: ["politics", "general"],
+  },
+  {
+    name: "Reuters World",
+    url: "https://www.reutersagency.com/feed/?best-topics=world&post_type=best",
+    region: "intl",
+    profile: "mainstream",
+    topics: ["general", "politics"],
+  },
+  {
+    name: "BBC World",
+    url: "http://feeds.bbci.co.uk/news/world/rss.xml",
+    region: "intl",
+    profile: "mainstream",
+    topics: ["general", "politics"],
+  },
+  {
+    name: "The Guardian World",
+    url: "https://www.theguardian.com/world/rss",
+    region: "intl",
+    profile: "mainstream",
+    topics: ["general", "politics"],
+  },
+  {
+    name: "NYT World",
+    url: "https://rss.nytimes.com/services/xml/rss/nyt/World.xml",
+    region: "intl",
+    profile: "mainstream",
+    topics: ["general", "politics"],
+  },
+  {
+    name: "Politico Europe",
+    url: "https://www.politico.eu/feed/",
+    region: "intl",
+    profile: "mainstream",
+    topics: ["politics"],
+  },
+  {
+    name: "Al Jazeera",
+    url: "https://www.aljazeera.com/xml/rss/all.xml",
+    region: "intl",
+    profile: "mainstream",
+    topics: ["general", "politics"],
+  },
+  {
+    name: "The Intercept",
+    url: "https://theintercept.com/feed/",
+    region: "intl",
+    profile: "alternative",
+    topics: ["politics", "general"],
+  },
+  {
+    name: "Jacobin",
+    url: "https://jacobin.com/feed",
+    region: "intl",
+    profile: "alternative",
+    topics: ["politics"],
+  },
+  {
+    name: "Reason",
+    url: "https://reason.com/feed/",
+    region: "intl",
+    profile: "alternative",
+    topics: ["politics", "general"],
+  },
+  {
+    name: "UnHerd",
+    url: "https://unherd.com/feed/",
+    region: "intl",
+    profile: "alternative",
+    topics: ["politics", "general"],
+  },
+];
 
 export function useFeedManager() {
   const feeds = ref([]);
@@ -16,6 +158,57 @@ export function useFeedManager() {
 
   const activeFeeds = computed(() => feeds.value.filter((f) => f && f.active));
   const activeFeedCount = computed(() => activeFeeds.value.length);
+
+  const inferRegionFromUrl = (url = "") => {
+    const lower = url.toLowerCase();
+    if (
+      lower.includes(".de") ||
+      lower.includes("tagesschau") ||
+      lower.includes("spiegel") ||
+      lower.includes("zeit")
+    ) {
+      return "de";
+    }
+    return "intl";
+  };
+
+  const normalizeTopics = (topics) => {
+    if (!Array.isArray(topics) || topics.length === 0) {
+      return ["general"];
+    }
+
+    const allowed = topics.filter(
+      (topic) => topic === "politics" || topic === "general",
+    );
+    return allowed.length > 0 ? allowed : ["general"];
+  };
+
+  const normalizeFeedMetadata = (feed) => {
+    if (!feed) return feed;
+
+    return {
+      ...feed,
+      region:
+        feed.region === "de" || feed.region === "intl"
+          ? feed.region
+          : inferRegionFromUrl(feed.url),
+      profile: feed.profile === "alternative" ? "alternative" : "mainstream",
+      topics: normalizeTopics(feed.topics),
+    };
+  };
+
+  const normalizeUrl = (url = "") =>
+    url.trim().toLowerCase().replace(/\/$/, "");
+
+  const generateFeedId = () => {
+    if (
+      typeof crypto !== "undefined" &&
+      typeof crypto.randomUUID === "function"
+    ) {
+      return crypto.randomUUID();
+    }
+    return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  };
 
   const rebuildAllArticles = () => {
     const merged = [];
@@ -45,6 +238,7 @@ export function useFeedManager() {
       if (!Array.isArray(feeds.value)) {
         feeds.value = [];
       }
+      feeds.value = feeds.value.map((feed) => normalizeFeedMetadata(feed));
     } catch (error) {
       console.error(
         "Gespeicherte Feed-Daten sind ungültig, Storage wird zurückgesetzt.",
@@ -75,15 +269,25 @@ export function useFeedManager() {
   };
 
   // Feed Management
-  const addFeed = (name, url, fallbackUrl = "") => {
-    const feed = {
-      id: Date.now().toString(),
+  const addFeed = (
+    name,
+    url,
+    fallbackUrl = "",
+    region = "de",
+    profile = "mainstream",
+    topics = ["general"],
+  ) => {
+    const feed = normalizeFeedMetadata({
+      id: generateFeedId(),
       name,
       url,
       fallbackUrl,
+      region,
+      profile,
+      topics,
       active: true,
       addedAt: new Date().toISOString(),
-    };
+    });
     feeds.value.push(feed);
     feedArticles.value[feed.id] = [];
     feedLoading.value[feed.id] = false;
@@ -92,15 +296,65 @@ export function useFeedManager() {
     return feed;
   };
 
-  const updateFeed = (id, name, url, fallbackUrl = "") => {
+  const importRecommendedFeeds = () => {
+    const existing = new Set(
+      feeds.value.map((feed) => normalizeUrl(feed?.url || "")),
+    );
+    const created = [];
+
+    RECOMMENDED_FEEDS.forEach((candidate) => {
+      const normalizedCandidateUrl = normalizeUrl(candidate.url);
+      if (!normalizedCandidateUrl || existing.has(normalizedCandidateUrl)) {
+        return;
+      }
+
+      const feed = normalizeFeedMetadata({
+        id: generateFeedId(),
+        name: candidate.name,
+        url: candidate.url,
+        fallbackUrl: candidate.fallbackUrl || "",
+        region: candidate.region,
+        profile: candidate.profile,
+        topics: candidate.topics,
+        active: true,
+        addedAt: new Date().toISOString(),
+      });
+
+      feeds.value.push(feed);
+      feedArticles.value[feed.id] = [];
+      feedLoading.value[feed.id] = false;
+      feedErrors.value[feed.id] = null;
+      existing.add(normalizedCandidateUrl);
+      created.push(feed);
+    });
+
+    if (created.length > 0) {
+      saveFeeds();
+    }
+
+    return created;
+  };
+
+  const updateFeed = (
+    id,
+    name,
+    url,
+    fallbackUrl = "",
+    region = "de",
+    profile = "mainstream",
+    topics = ["general"],
+  ) => {
     const feedIndex = feeds.value.findIndex((f) => f.id === id);
     if (feedIndex !== -1) {
-      feeds.value[feedIndex] = {
+      feeds.value[feedIndex] = normalizeFeedMetadata({
         ...feeds.value[feedIndex],
         name,
         url,
         fallbackUrl,
-      };
+        region,
+        profile,
+        topics,
+      });
       saveFeeds();
       rebuildAllArticles();
       return feeds.value[feedIndex];
@@ -398,6 +652,7 @@ export function useFeedManager() {
     toggleFeedActive,
     reorderFeeds,
     getFeed,
+    importRecommendedFeeds,
     loadFeedContent,
     formatDate,
     refreshAllFeeds,

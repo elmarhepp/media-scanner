@@ -13,7 +13,7 @@
             v-model="formData.name"
             placeholder="z.B. Tagesschau"
             required
-          >
+          />
         </div>
         <div class="form-group">
           <label for="editFeedUrl">Feed URL (primär)</label>
@@ -23,7 +23,7 @@
             v-model="formData.url"
             placeholder="https://example.com/rss"
             required
-          >
+          />
         </div>
         <div class="form-group">
           <label for="editFeedFallbackUrl">Fallback URL (optional)</label>
@@ -32,7 +32,42 @@
             id="editFeedFallbackUrl"
             v-model="formData.fallbackUrl"
             placeholder="https://example.com/rss-alternate"
-          >
+          />
+        </div>
+        <div class="form-group">
+          <label for="editFeedRegion">Region</label>
+          <select id="editFeedRegion" v-model="formData.region">
+            <option value="de">Deutschland</option>
+            <option value="intl">International</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="editFeedProfile">Profil</label>
+          <select id="editFeedProfile" v-model="formData.profile">
+            <option value="mainstream">Mainstream</option>
+            <option value="alternative">Alternativ</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Themen</label>
+          <div class="checkbox-row">
+            <label class="checkbox-label">
+              <input
+                type="checkbox"
+                value="politics"
+                v-model="formData.topics"
+              />
+              Politisch
+            </label>
+            <label class="checkbox-label">
+              <input
+                type="checkbox"
+                value="general"
+                v-model="formData.topics"
+              />
+              Allgemein
+            </label>
+          </div>
         </div>
         <div class="modal-actions">
           <button type="button" @click="$emit('close')" class="secondary">
@@ -46,29 +81,50 @@
 </template>
 
 <script setup>
-import { ref, watch } from 'vue'
+import { ref, watch } from "vue";
 
 const props = defineProps({
   show: Boolean,
-  feed: Object
-})
+  feed: Object,
+});
 
-const emit = defineEmits(['close', 'update'])
+const emit = defineEmits(["close", "update"]);
 
 const formData = ref({
   id: null,
-  name: '',
-  url: '',
-  fallbackUrl: ''
-})
+  name: "",
+  url: "",
+  fallbackUrl: "",
+  region: "de",
+  profile: "mainstream",
+  topics: ["general"],
+});
 
 const handleSubmit = () => {
-  emit('update', { ...formData.value })
-}
-
-watch(() => props.feed, (newFeed) => {
-  if (newFeed) {
-    formData.value = { ...newFeed }
+  if (
+    !Array.isArray(formData.value.topics) ||
+    formData.value.topics.length === 0
+  ) {
+    formData.value.topics = ["general"];
   }
-}, { immediate: true })
+  emit("update", { ...formData.value });
+};
+
+watch(
+  () => props.feed,
+  (newFeed) => {
+    if (newFeed) {
+      formData.value = {
+        ...newFeed,
+        region: newFeed.region || "de",
+        profile: newFeed.profile || "mainstream",
+        topics:
+          Array.isArray(newFeed.topics) && newFeed.topics.length > 0
+            ? [...newFeed.topics]
+            : ["general"],
+      };
+    }
+  },
+  { immediate: true },
+);
 </script>
