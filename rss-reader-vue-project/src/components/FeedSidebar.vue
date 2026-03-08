@@ -69,34 +69,6 @@
           </button>
         </div>
 
-        <div class="filter-label">Profil</div>
-        <div class="toggle-group">
-          <button
-            type="button"
-            class="filter-btn"
-            :class="{ active: selectedProfile === 'all' }"
-            @click="$emit('set-profile', 'all')"
-          >
-            Alle ({{ profileCounts?.all || 0 }})
-          </button>
-          <button
-            type="button"
-            class="filter-btn"
-            :class="{ active: selectedProfile === 'mainstream' }"
-            @click="$emit('set-profile', 'mainstream')"
-          >
-            Mainstream ({{ profileCounts?.mainstream || 0 }})
-          </button>
-          <button
-            type="button"
-            class="filter-btn"
-            :class="{ active: selectedProfile === 'alternative' }"
-            @click="$emit('set-profile', 'alternative')"
-          >
-            Alternativ ({{ profileCounts?.alternative || 0 }})
-          </button>
-        </div>
-
         <div class="filter-label">Thema</div>
         <div class="toggle-group">
           <button
@@ -211,9 +183,6 @@
             :title="feed.name"
           >
             {{ feed.name }}
-            <span class="feed-meta">{{
-              feed.profile === "alternative" ? "Alternativ" : "Mainstream"
-            }}</span>
           </div>
           <div
             class="toggle-switch"
@@ -235,11 +204,9 @@ const props = defineProps({
   feeds: Array,
   feedQuery: String,
   selectedRegion: String,
-  selectedProfile: String,
   selectedTopic: String,
   selectedArticleCategory: String,
   regionCounts: Object,
-  profileCounts: Object,
   topicCounts: Object,
   articleCategoryCounts: Object,
   topSourceLinks: {
@@ -287,7 +254,6 @@ defineEmits([
   "open-add-modal",
   "import-recommended",
   "set-region",
-  "set-profile",
   "set-topic",
   "set-feed-query",
   "set-article-category",

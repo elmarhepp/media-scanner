@@ -5,11 +5,9 @@
       :feeds="filteredFeeds"
       :feedQuery="feedQuery"
       :selectedRegion="selectedRegion"
-      :selectedProfile="selectedProfile"
       :selectedTopic="selectedTopic"
       :selectedArticleCategory="selectedArticleCategory"
       :regionCounts="regionCounts"
-      :profileCounts="profileCounts"
       :topicCounts="topicCounts"
       :articleCategoryCounts="articleCategoryCounts"
       :topSourceLinks="topSourceLinks"
@@ -19,7 +17,6 @@
       @open-add-modal="showAddModal = true"
       @import-recommended="handleImportRecommended"
       @set-region="selectedRegion = $event"
-      @set-profile="selectedProfile = $event"
       @set-topic="selectedTopic = $event"
       @set-feed-query="feedQuery = $event"
       @set-article-category="selectedArticleCategory = $event"
@@ -89,7 +86,7 @@
           <div v-else-if="filteredFeeds.length === 0" class="empty-state">
             <div class="empty-state-icon">🧭</div>
             <h2>Keine Feeds in dieser Gruppe</h2>
-            <p>Ändere Region, Profil oder Themen-Filter in der Sidebar.</p>
+            <p>Ändere Region, Themen- oder Kategorie-Filter in der Sidebar.</p>
           </div>
           <div v-else-if="filteredActiveFeeds.length === 0" class="empty-state">
             <div class="empty-state-icon">👁️</div>
@@ -172,7 +169,6 @@ const isRefreshing = ref(false);
 
 // Navigation / Grouping
 const selectedRegion = ref("de");
-const selectedProfile = ref("all");
 const selectedTopic = ref("all");
 const selectedArticleCategory = ref("all");
 const feedQuery = ref("");
@@ -181,12 +177,10 @@ const scopedFeeds = computed(() =>
   feeds.value.filter((feed) => {
     if (!feed) return false;
     const regionMatch = feed.region === selectedRegion.value;
-    const profileMatch =
-      selectedProfile.value === "all" || feed.profile === selectedProfile.value;
     const topicMatch =
       selectedTopic.value === "all" ||
       (Array.isArray(feed.topics) && feed.topics.includes(selectedTopic.value));
-    return regionMatch && profileMatch && topicMatch;
+    return regionMatch && topicMatch;
   }),
 );
 
@@ -254,10 +248,16 @@ const articleCategoryCounts = computed(() => {
   return counts;
 });
 
+const visibleArticlesForTopLinks = computed(() =>
+  filteredActiveFeeds.value.flatMap(
+    (feed) => displayedArticlesByFeed.value[feed.id] || [],
+  ),
+);
+
 const topSourceLinks = computed(() => {
   const sourceMap = new Map();
 
-  scopedArticles.value.forEach((article) => {
+  visibleArticlesForTopLinks.value.forEach((article) => {
     if (!article?.link) return;
     try {
       const parsed = new URL(article.link);
@@ -349,30 +349,10 @@ const regionCounts = computed(() => ({
   intl: feeds.value.filter((feed) => feed?.region === "intl").length,
 }));
 
-const profileCounts = computed(() => {
-  const inRegion = feeds.value.filter(
+const topicCounts = computed(() => {
+  const base = feeds.value.filter(
     (feed) => feed?.region === selectedRegion.value,
   );
-  return {
-    all: inRegion.length,
-    mainstream: inRegion.filter((feed) => feed?.profile === "mainstream")
-      .length,
-    alternative: inRegion.filter((feed) => feed?.profile === "alternative")
-      .length,
-  };
-});
-
-const topicCounts = computed(() => {
-  const base = feeds.value.filter((feed) => {
-    if (feed?.region !== selectedRegion.value) return false;
-    if (
-      selectedProfile.value !== "all" &&
-      feed?.profile !== selectedProfile.value
-    ) {
-      return false;
-    }
-    return true;
-  });
 
   return {
     all: base.length,
