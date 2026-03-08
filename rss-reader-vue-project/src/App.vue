@@ -1,6 +1,7 @@
 <template>
   <div class="app-wrapper">
     <FeedSidebar
+      :class="{ 'mobile-open': mobileMenuOpen }"
       :feeds="feeds"
       :draggedIndex="draggedIndex"
       :dragOverIndex="dragOverIndex"
@@ -164,6 +165,7 @@ const openEditModal = (feedId) => {
 }
 
 const scrollToFeed = (feedId) => {
+  mobileMenuOpen.value = false
   const feed = getFeed(feedId)
   if (feed && !feed.active) {
     toggleFeedActive(feedId)

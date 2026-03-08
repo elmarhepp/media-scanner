@@ -18,12 +18,22 @@
         >
           <div class="search-result-feed">{{ article.feedName }}</div>
           <div class="article-title">
-            <a :href="article.link" target="_blank" rel="noopener noreferrer" v-html="highlightSearchTerm(article.title)"></a>
+            <a :href="article.link" target="_blank" rel="noopener noreferrer">
+              <template v-for="(part, idx) in highlightSearchTerm(article.title)" :key="idx">
+                <span v-if="part.match" class="search-highlight">{{ part.text }}</span>
+                <template v-else>{{ part.text }}</template>
+              </template>
+            </a>
           </div>
           <div v-if="article.pubDate" class="article-meta">
             {{ formatDate(article.pubDate) }}
           </div>
-          <div v-if="article.description" class="article-description" v-html="highlightSearchTerm(article.description)"></div>
+          <div v-if="article.description" class="article-description">
+            <template v-for="(part, idx) in highlightSearchTerm(article.description)" :key="idx">
+              <span v-if="part.match" class="search-highlight">{{ part.text }}</span>
+              <template v-else>{{ part.text }}</template>
+            </template>
+          </div>
         </div>
       </div>
     </div>
@@ -38,9 +48,18 @@ const props = defineProps({
 })
 
 const highlightSearchTerm = (text) => {
-  if (!props.searchTerm) return text
-  const regex = new RegExp(`(${escapeRegex(props.searchTerm)})`, 'gi')
-  return text.replace(regex, '<span class="search-highlight">$1</span>')
+  const safeText = text || ''
+  const term = (props.searchTerm || '').trim()
+
+  if (!term) {
+    return [{ text: safeText, match: false }]
+  }
+
+  const regex = new RegExp(`(${escapeRegex(term)})`, 'gi')
+  return safeText
+    .split(regex)
+    .filter(part => part.length > 0)
+    .map(part => ({ text: part, match: part.toLowerCase() === term.toLowerCase() }))
 }
 
 const escapeRegex = (string) => {

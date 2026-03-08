@@ -18,10 +18,43 @@ export function useFeedManager() {
     const activeFeeds = computed(() => feeds.value.filter(f => f && f.active))
     const activeFeedCount = computed(() => activeFeeds.value.length)
 
+    const rebuildAllArticles = () => {
+        const merged = []
+
+        feeds.value.forEach(feed => {
+            if (!feed || !feed.id) return
+
+            const articles = feedArticles.value[feed.id] || []
+            articles.forEach(article => {
+                merged.push({
+                    ...article,
+                    feedId: feed.id,
+                    feedName: feed.name
+                })
+            })
+        })
+
+        allArticles.value = merged
+    }
+
     // Storage
     const loadFeeds = () => {
         const stored = localStorage.getItem(STORAGE_KEY)
-        feeds.value = stored ? JSON.parse(stored) : []
+
+        try {
+            feeds.value = stored ? JSON.parse(stored) : []
+            if (!Array.isArray(feeds.value)) {
+                feeds.value = []
+            }
+        } catch (error) {
+            console.error('Gespeicherte Feed-Daten sind ungültig, Storage wird zurückgesetzt.', error)
+            feeds.value = []
+            localStorage.removeItem(STORAGE_KEY)
+        }
+
+        feedArticles.value = {}
+        feedLoading.value = {}
+        feedErrors.value = {}
 
         // Initialize tracking objects
         feeds.value.forEach(feed => {
@@ -31,6 +64,8 @@ export function useFeedManager() {
                 feedErrors.value[feed.id] = null
             }
         })
+
+        rebuildAllArticles()
     }
 
     const saveFeeds = () => {
@@ -65,6 +100,7 @@ export function useFeedManager() {
                 fallbackUrl
             }
             saveFeeds()
+            rebuildAllArticles()
             return feeds.value[feedIndex]
         }
         return null
@@ -76,6 +112,7 @@ export function useFeedManager() {
         delete feedLoading.value[id]
         delete feedErrors.value[id]
         saveFeeds()
+        rebuildAllArticles()
     }
 
     const toggleFeedActive = (id) => {
@@ -102,15 +139,7 @@ export function useFeedManager() {
         try {
             const articles = await fetchFeedWithFallback(feed)
             feedArticles.value[feed.id] = articles
-
-            // Add to search collection
-            articles.forEach(article => {
-                allArticles.value.push({
-                    ...article,
-                    feedId: feed.id,
-                    feedName: feed.name
-                })
-            })
+            rebuildAllArticles()
         } catch (error) {
             console.error(`Feed ${feed.name} konnte nicht geladen werden:`, error)
             feedErrors.value[feed.id] = error.message
@@ -289,9 +318,10 @@ export function useFeedManager() {
     }
 
     const refreshAllFeeds = async () => {
-        allArticles.value = []
-        const promises = feeds.value.map(feed => loadFeedContent(feed))
+        const activeOnlyFeeds = feeds.value.filter(feed => feed && feed.active)
+        const promises = activeOnlyFeeds.map(feed => loadFeedContent(feed))
         await Promise.all(promises)
+        rebuildAllArticles()
     }
 
     return {
