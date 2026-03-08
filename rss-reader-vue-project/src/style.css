@@ -98,6 +98,15 @@ body {
   width: 100%;
 }
 
+.sidebar-status-message {
+  font-size: 0.8rem;
+  color: #2f506e;
+  background: #eef5fb;
+  border: 1px solid #d7e5f2;
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+
 .sidebar-section {
   margin-bottom: 16px;
   padding-bottom: 14px;

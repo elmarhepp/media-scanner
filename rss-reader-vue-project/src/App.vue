@@ -12,6 +12,8 @@
       :articleCategoryCounts="articleCategoryCounts"
       :topSourceLinks="topSourceLinks"
       :sidebarStats="sidebarStats"
+      :isImporting="isImportingFeeds"
+      :importMessage="importMessage"
       :draggedFeedId="draggedFeedId"
       :dragOverFeedId="dragOverFeedId"
       @open-add-modal="showAddModal = true"
@@ -166,6 +168,8 @@ const mobileMenuOpen = ref(false);
 const draggedFeedId = ref(null);
 const dragOverFeedId = ref(null);
 const isRefreshing = ref(false);
+const isImportingFeeds = ref(false);
+const importMessage = ref("");
 
 // Navigation / Grouping
 const selectedRegion = ref("de");
@@ -439,20 +443,27 @@ const handleRefreshAll = async () => {
 };
 
 const handleImportRecommended = async () => {
+  importMessage.value = "";
   const createdFeeds = importRecommendedFeeds();
   if (createdFeeds.length === 0) {
-    alert("Alle Vorschlags-Feeds sind bereits vorhanden.");
+    importMessage.value = "Alle Vorschlags-Feeds sind bereits vorhanden.";
     return;
   }
 
-  isRefreshing.value = true;
+  isImportingFeeds.value = true;
   try {
     await Promise.all(createdFeeds.map((feed) => loadFeedContent(feed)));
+    importMessage.value = `${createdFeeds.length} Vorschlags-Feeds wurden hinzugefuegt.`;
+  } catch (error) {
+    console.error(
+      "Vorschlags-Feeds konnten nicht komplett importiert werden",
+      error,
+    );
+    importMessage.value =
+      "Import gestartet, aber nicht alle Feeds konnten geladen werden.";
   } finally {
-    isRefreshing.value = false;
+    isImportingFeeds.value = false;
   }
-
-  alert(`${createdFeeds.length} Vorschlags-Feeds wurden hinzugefuegt.`);
 };
 
 // Drag & Drop

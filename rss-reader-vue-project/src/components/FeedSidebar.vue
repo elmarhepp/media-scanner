@@ -147,11 +147,16 @@
       <button
         @click="$emit('import-recommended')"
         class="secondary sidebar-action-btn"
+        :disabled="isImporting"
       >
-        <span>📚</span> Vorschlags-Feeds importieren
+        <span>📚</span>
+        {{ isImporting ? "Importiere..." : "Vorschlags-Feeds importieren" }}
       </button>
       <div class="sidebar-empty">
         Import fuegt nur noch nicht vorhandene Feed-URLs hinzu.
+      </div>
+      <div v-if="importMessage" class="sidebar-status-message">
+        {{ importMessage }}
       </div>
     </div>
 
@@ -213,6 +218,8 @@ const props = defineProps({
     type: Array,
     default: () => [],
   },
+  isImporting: Boolean,
+  importMessage: String,
   sidebarStats: Object,
   draggedFeedId: String,
   dragOverFeedId: String,

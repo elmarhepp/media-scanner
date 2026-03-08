@@ -606,6 +606,50 @@ export function useFeedManager() {
   const fetchFeed = async (url) => {
     let lastError = null;
 
+    // First try same-origin backend fetch endpoint (Railway), which can bypass
+    // some anti-bot blocks that stop public CORS proxies.
+    try {
+      console.log("Versuche Backend-Proxy /api/fetch-feed");
+      const response = await fetch(
+        `/api/fetch-feed?url=${encodeURIComponent(url)}`,
+        {
+          signal: AbortSignal.timeout(20000),
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const text = await response.text();
+      if (!text.trim().startsWith("<")) {
+        throw new Error("Keine gültige XML-Antwort");
+      }
+
+      const parser = new DOMParser();
+      const xml = parser.parseFromString(text, "text/xml");
+      const parserError = xml.querySelector("parsererror");
+      if (parserError) {
+        throw new Error("XML-Format ungültig");
+      }
+
+      const isRSS = xml.querySelector("rss, rdf\\:RDF");
+      const isAtom = xml.querySelector("feed");
+      if (isRSS) {
+        console.log("✓ Backend-Proxy erfolgreich (RSS)");
+        return parseRSS(xml);
+      }
+      if (isAtom) {
+        console.log("✓ Backend-Proxy erfolgreich (Atom)");
+        return parseAtom(xml);
+      }
+
+      throw new Error("Feed-Format nicht erkannt");
+    } catch (error) {
+      console.warn("✗ Backend-Proxy fehlgeschlagen:", error.message);
+      lastError = error;
+    }
+
     for (let i = 0; i < CORS_PROXIES.length; i++) {
       const proxy = CORS_PROXIES[i];
       try {
