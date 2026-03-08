@@ -4,7 +4,9 @@
       <div class="feed-header">
         <div>
           <div class="feed-title">{{ feed.name }}</div>
-          <div v-if="feed.fallbackUrl" class="feed-url-info">Mit Fallback-URL</div>
+          <div v-if="feed.fallbackUrl" class="feed-url-info">
+            Mit Fallback-URL
+          </div>
         </div>
         <div class="feed-actions">
           <button class="edit" @click="$emit('edit', feed.id)">✎</button>
@@ -17,9 +19,9 @@
           Lade Artikel...
         </div>
         <div v-else-if="error" class="error">
-          <strong>Fehler beim Laden</strong><br>
-          {{ error }}<br>
-          <small style="margin-top: 8px; display: block;">
+          <strong>Fehler beim Laden</strong><br />
+          {{ error }}<br />
+          <small style="margin-top: 8px; display: block">
             Überprüfe die Feed-URLs oder versuche es später erneut.
           </small>
         </div>
@@ -36,6 +38,21 @@
             </div>
             <div v-if="article.pubDate" class="article-meta">
               {{ formatDate(article.pubDate) }}
+            </div>
+            <div
+              v-if="
+                Array.isArray(article.categories) &&
+                article.categories.length > 0
+              "
+              class="article-categories"
+            >
+              <span
+                v-for="category in article.categories.slice(0, 3)"
+                :key="`${article.link}-${category}`"
+                class="article-category-tag"
+              >
+                {{ category }}
+              </span>
             </div>
             <div v-if="article.description" class="article-description">
               {{ article.description }}
@@ -54,8 +71,8 @@ defineProps({
   articles: Array,
   loading: Boolean,
   error: String,
-  formatDate: Function
-})
+  formatDate: Function,
+});
 
-defineEmits(['edit', 'remove'])
+defineEmits(["edit", "remove"]);
 </script>

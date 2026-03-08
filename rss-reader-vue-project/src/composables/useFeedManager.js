@@ -266,6 +266,77 @@ export function useFeedManager() {
     allArticles.value = merged;
   };
 
+  const cleanCategoryText = (value = "") => {
+    return value
+      .trim()
+      .replace(/\s+/g, " ")
+      .replace(/[\/|>]+/g, " ")
+      .replace(/^#+/, "")
+      .replace(/[\[\]{}()]/g, "")
+      .trim();
+  };
+
+  const normalizeCategory = (value = "") => {
+    const cleaned = cleanCategoryText(value);
+    if (!cleaned) return "";
+    if (cleaned.length <= 2) return "";
+    return cleaned.toLowerCase();
+  };
+
+  const extractRssCategories = (item) => {
+    const values = [];
+
+    item.querySelectorAll("category").forEach((node) => {
+      if (node?.textContent) values.push(node.textContent);
+    });
+
+    item.querySelectorAll("dc\\:subject").forEach((node) => {
+      if (node?.textContent) values.push(node.textContent);
+    });
+
+    return [
+      ...new Set(
+        values.map((entry) => normalizeCategory(entry)).filter(Boolean),
+      ),
+    ];
+  };
+
+  const extractAtomCategories = (entry) => {
+    const values = [];
+
+    entry.querySelectorAll("category").forEach((node) => {
+      const term = node.getAttribute("term");
+      const label = node.getAttribute("label");
+      const content = node.textContent;
+
+      if (term) values.push(term);
+      if (label) values.push(label);
+      if (content) values.push(content);
+    });
+
+    return [
+      ...new Set(values.map((item) => normalizeCategory(item)).filter(Boolean)),
+    ];
+  };
+
+  const extractJsonCategories = (item) => {
+    const values = [];
+
+    if (Array.isArray(item?.categories)) {
+      values.push(...item.categories);
+    }
+
+    if (Array.isArray(item?.tags)) {
+      values.push(...item.tags);
+    }
+
+    return [
+      ...new Set(
+        values.map((entry) => normalizeCategory(entry)).filter(Boolean),
+      ),
+    ];
+  };
+
   // Storage
   const loadFeeds = () => {
     const stored = localStorage.getItem(STORAGE_KEY);
@@ -559,6 +630,7 @@ export function useFeedManager() {
         link: item?.link || "#",
         description: cleanDescription(item?.description || item?.content || ""),
         pubDate: item?.pubDate || "",
+        categories: extractJsonCategories(item),
       });
     });
 
@@ -597,6 +669,7 @@ export function useFeedManager() {
             item.querySelector("pubDate")?.textContent ||
             item.querySelector("dc\\:date")?.textContent ||
             "",
+          categories: extractRssCategories(item),
         });
       }
     });
@@ -628,6 +701,7 @@ export function useFeedManager() {
             entry.querySelector("published")?.textContent ||
             entry.querySelector("updated")?.textContent ||
             "",
+          categories: extractAtomCategories(entry),
         });
       }
     });

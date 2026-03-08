@@ -3,12 +3,17 @@
     <FeedSidebar
       :class="{ 'mobile-open': mobileMenuOpen }"
       :feeds="filteredFeeds"
+      :feedQuery="feedQuery"
       :selectedRegion="selectedRegion"
       :selectedProfile="selectedProfile"
       :selectedTopic="selectedTopic"
+      :selectedArticleCategory="selectedArticleCategory"
       :regionCounts="regionCounts"
       :profileCounts="profileCounts"
       :topicCounts="topicCounts"
+      :articleCategoryCounts="articleCategoryCounts"
+      :topSourceLinks="topSourceLinks"
+      :sidebarStats="sidebarStats"
       :draggedFeedId="draggedFeedId"
       :dragOverFeedId="dragOverFeedId"
       @open-add-modal="showAddModal = true"
@@ -16,6 +21,8 @@
       @set-region="selectedRegion = $event"
       @set-profile="selectedProfile = $event"
       @set-topic="selectedTopic = $event"
+      @set-feed-query="feedQuery = $event"
+      @set-article-category="selectedArticleCategory = $event"
       @toggle-feed="toggleFeedActive"
       @scroll-to-feed="scrollToFeed"
       @start-drag="startDrag"
@@ -89,12 +96,17 @@
             <h2>Alle gefilterten Feeds sind ausgeblendet</h2>
             <p>Aktiviere Feeds in der Sidebar, um sie anzuzeigen.</p>
           </div>
+          <div v-else-if="visibleActiveFeeds.length === 0" class="empty-state">
+            <div class="empty-state-icon">🏷️</div>
+            <h2>Keine Artikel in dieser Kategorie gefunden</h2>
+            <p>Waehle eine andere Kategorie oder setze den Filter zurueck.</p>
+          </div>
           <template v-else>
             <FeedCard
-              v-for="feed in filteredActiveFeeds"
+              v-for="feed in visibleActiveFeeds"
               :key="feed.id"
               :feed="feed"
-              :articles="feedArticles[feed.id]"
+              :articles="displayedArticlesByFeed[feed.id]"
               :loading="feedLoading[feed.id]"
               :error="feedErrors[feed.id]"
               :formatDate="formatDate"
@@ -162,8 +174,10 @@ const isRefreshing = ref(false);
 const selectedRegion = ref("de");
 const selectedProfile = ref("all");
 const selectedTopic = ref("all");
+const selectedArticleCategory = ref("all");
+const feedQuery = ref("");
 
-const filteredFeeds = computed(() =>
+const scopedFeeds = computed(() =>
   feeds.value.filter((feed) => {
     if (!feed) return false;
     const regionMatch = feed.region === selectedRegion.value;
@@ -176,9 +190,159 @@ const filteredFeeds = computed(() =>
   }),
 );
 
+const filteredFeeds = computed(() => {
+  const query = feedQuery.value.trim().toLowerCase();
+  if (!query) {
+    return scopedFeeds.value;
+  }
+
+  return scopedFeeds.value.filter((feed) => {
+    const name = feed?.name?.toLowerCase() || "";
+    const url = feed?.url?.toLowerCase() || "";
+    return name.includes(query) || url.includes(query);
+  });
+});
+
 const filteredActiveFeeds = computed(() =>
   filteredFeeds.value.filter((feed) => feed.active),
 );
+
+const visibleActiveFeeds = computed(() => {
+  if (selectedArticleCategory.value === "all") {
+    return filteredActiveFeeds.value;
+  }
+
+  return filteredActiveFeeds.value.filter((feed) => {
+    if (feedLoading.value[feed.id] || feedErrors.value[feed.id]) {
+      return true;
+    }
+
+    const visibleArticles = displayedArticlesByFeed.value[feed.id] || [];
+    return visibleArticles.length > 0;
+  });
+});
+
+const sidebarStats = computed(() => ({
+  visible: filteredFeeds.value.length,
+  active: filteredActiveFeeds.value.length,
+}));
+
+const allowedFeedIds = computed(
+  () => new Set(filteredFeeds.value.map((feed) => feed.id)),
+);
+
+const scopedArticles = computed(() =>
+  allArticles.value.filter((article) =>
+    allowedFeedIds.value.has(article.feedId),
+  ),
+);
+
+const articleCategoryCounts = computed(() => {
+  const counts = { all: scopedArticles.value.length };
+
+  scopedArticles.value.forEach((article) => {
+    const categories = Array.isArray(article?.categories)
+      ? article.categories
+      : [];
+
+    categories.forEach((category) => {
+      if (!category) return;
+      counts[category] = (counts[category] || 0) + 1;
+    });
+  });
+
+  return counts;
+});
+
+const topSourceLinks = computed(() => {
+  const sourceMap = new Map();
+
+  scopedArticles.value.forEach((article) => {
+    if (!article?.link) return;
+    try {
+      const parsed = new URL(article.link);
+      const domain = parsed.hostname.replace(/^www\./, "").toLowerCase();
+      if (!domain) return;
+
+      const existing = sourceMap.get(domain) || {
+        domain,
+        url: `${parsed.protocol}//${parsed.hostname}`,
+        count: 0,
+      };
+      existing.count += 1;
+      sourceMap.set(domain, existing);
+    } catch {
+      // Ignore malformed URLs.
+    }
+  });
+
+  return Array.from(sourceMap.values())
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 8);
+});
+
+const categoryRanking = computed(() => {
+  const entries = Object.entries(articleCategoryCounts.value)
+    .filter(([key]) => key !== "all")
+    .sort(([, countA], [, countB]) => countB - countA);
+
+  const ranking = {};
+  entries.forEach(([category], index) => {
+    ranking[category] = entries.length - index;
+  });
+  return ranking;
+});
+
+const toTimestamp = (pubDate = "") => {
+  const ts = new Date(pubDate).getTime();
+  return Number.isFinite(ts) ? ts : 0;
+};
+
+const displayedArticlesByFeed = computed(() => {
+  const byFeedId = {};
+  const selected = selectedArticleCategory.value;
+
+  filteredActiveFeeds.value.forEach((feed) => {
+    const items = [...(feedArticles.value[feed.id] || [])];
+    const categoryFiltered =
+      selected === "all"
+        ? items
+        : items.filter((article) =>
+            Array.isArray(article?.categories)
+              ? article.categories.includes(selected)
+              : false,
+          );
+
+    categoryFiltered.sort((a, b) => {
+      if (selected !== "all") {
+        return toTimestamp(b.pubDate) - toTimestamp(a.pubDate);
+      }
+
+      const scoreA = Math.max(
+        0,
+        ...(Array.isArray(a?.categories)
+          ? a.categories.map((cat) => categoryRanking.value[cat] || 0)
+          : [0]),
+      );
+      const scoreB = Math.max(
+        0,
+        ...(Array.isArray(b?.categories)
+          ? b.categories.map((cat) => categoryRanking.value[cat] || 0)
+          : [0]),
+      );
+
+      if (scoreA !== scoreB) {
+        return scoreB - scoreA;
+      }
+
+      return toTimestamp(b.pubDate) - toTimestamp(a.pubDate);
+    });
+
+    byFeedId[feed.id] = categoryFiltered;
+  });
+
+  return byFeedId;
+});
 
 const regionCounts = computed(() => ({
   de: feeds.value.filter((feed) => feed?.region === "de").length,
@@ -357,6 +521,15 @@ const performSearch = () => {
   const allowedFeedIds = new Set(filteredFeeds.value.map((feed) => feed.id));
   searchResults.value = allArticles.value.filter((article) => {
     if (!allowedFeedIds.has(article.feedId)) {
+      return false;
+    }
+    if (
+      selectedArticleCategory.value !== "all" &&
+      !(
+        Array.isArray(article.categories) &&
+        article.categories.includes(selectedArticleCategory.value)
+      )
+    ) {
       return false;
     }
     const titleMatch = article.title.toLowerCase().includes(searchLower);
