@@ -2,11 +2,10 @@ import { ref, computed } from "vue";
 
 const STORAGE_KEY = "rss-feeds-vue";
 const CORS_PROXIES = [
+  "https://api.codetabs.com/v1/proxy/?quest=",
   "https://api.allorigins.win/raw?url=",
-  "https://corsproxy.io/?",
-  "https://api.codetabs.com/v1/proxy?quest=",
-  "https://cors-anywhere.herokuapp.com/",
 ];
+const RSS2JSON_ENDPOINT = "https://api.rss2json.com/v1/api.json?rss_url=";
 
 export function useFeedManager() {
   const feeds = ref([]);
@@ -227,9 +226,45 @@ export function useFeedManager() {
       }
     }
 
+    // Final fallback: rss2json (returns JSON, can bypass strict XML proxy limits)
+    try {
+      console.log("Versuche JSON-Fallback über rss2json");
+      const response = await fetch(RSS2JSON_ENDPOINT + encodeURIComponent(url), {
+        signal: AbortSignal.timeout(10000),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const payload = await response.json();
+      if (!payload || payload.status !== "ok" || !Array.isArray(payload.items)) {
+        throw new Error("Ungültige JSON-Antwort vom Fallback");
+      }
+
+      return parseRss2Json(payload.items);
+    } catch (error) {
+      console.warn("✗ rss2json fehlgeschlagen:", error.message);
+      lastError = error;
+    }
+
     throw new Error(
-      `Alle Proxies fehlgeschlagen. Letzter Fehler: ${lastError?.message || "Unbekannt"}`,
+      `Alle Feed-Quellen fehlgeschlagen. Letzter Fehler: ${lastError?.message || "Unbekannt"}`,
     );
+  };
+
+  const parseRss2Json = (items) => {
+    const articles = [];
+    items.slice(0, 10).forEach((item) => {
+      articles.push({
+        title: (item?.title || "Kein Titel").trim(),
+        link: item?.link || "#",
+        description: cleanDescription(item?.description || item?.content || ""),
+        pubDate: item?.pubDate || "",
+      });
+    });
+
+    return articles;
   };
 
   const parseRSS = (xml) => {

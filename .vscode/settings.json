@@ -1,5 +1,8 @@
 {
   "chat.tools.terminal.autoApprove": {
-    "npm run build": true
+    "npm run build": true,
+    "command": true,
+    "railway": true,
+    "npm --prefix /Users/elmarhepp/workspace/media-scanner/rss-reader-vue-project": true
   }
 }
