@@ -229,16 +229,23 @@ export function useFeedManager() {
     // Final fallback: rss2json (returns JSON, can bypass strict XML proxy limits)
     try {
       console.log("Versuche JSON-Fallback über rss2json");
-      const response = await fetch(RSS2JSON_ENDPOINT + encodeURIComponent(url), {
-        signal: AbortSignal.timeout(10000),
-      });
+      const response = await fetch(
+        RSS2JSON_ENDPOINT + encodeURIComponent(url),
+        {
+          signal: AbortSignal.timeout(10000),
+        },
+      );
 
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
 
       const payload = await response.json();
-      if (!payload || payload.status !== "ok" || !Array.isArray(payload.items)) {
+      if (
+        !payload ||
+        payload.status !== "ok" ||
+        !Array.isArray(payload.items)
+      ) {
         throw new Error("Ungültige JSON-Antwort vom Fallback");
       }
 
