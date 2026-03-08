@@ -18,8 +18,13 @@
     <div class="main-content">
       <div class="container">
         <header>
-          <div style="display: flex; align-items: center; gap: 15px;">
-            <button class="mobile-menu-btn" @click="mobileMenuOpen = !mobileMenuOpen">☰</button>
+          <div style="display: flex; align-items: center; gap: 15px">
+            <button
+              class="mobile-menu-btn"
+              @click="mobileMenuOpen = !mobileMenuOpen"
+            >
+              ☰
+            </button>
             <h1>RSS Feed Reader</h1>
           </div>
           <div class="header-actions">
@@ -31,13 +36,22 @@
                 placeholder="Artikel durchsuchen..."
                 @keyup.enter="performSearch"
                 @input="handleSearchInput"
+              />
+              <button
+                v-if="isSearchActive"
+                @click="clearSearch"
+                class="secondary"
               >
-              <button v-if="isSearchActive" @click="clearSearch" class="secondary">
                 <span>✕</span> Zurücksetzen
               </button>
             </div>
-            <button @click="handleRefreshAll" class="secondary" :disabled="isRefreshing">
-              <span>🔄</span> {{ isRefreshing ? 'Aktualisiert...' : 'Aktualisieren' }}
+            <button
+              @click="handleRefreshAll"
+              class="secondary"
+              :disabled="isRefreshing"
+            >
+              <span>🔄</span>
+              {{ isRefreshing ? "Aktualisiert..." : "Aktualisieren" }}
             </button>
           </div>
         </header>
@@ -93,13 +107,13 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
-import { useFeedManager } from './composables/useFeedManager'
-import FeedSidebar from './components/FeedSidebar.vue'
-import FeedCard from './components/FeedCard.vue'
-import SearchResults from './components/SearchResults.vue'
-import AddFeedModal from './components/AddFeedModal.vue'
-import EditFeedModal from './components/EditFeedModal.vue'
+import { ref, onMounted } from "vue";
+import { useFeedManager } from "./composables/useFeedManager";
+import FeedSidebar from "./components/FeedSidebar.vue";
+import FeedCard from "./components/FeedCard.vue";
+import SearchResults from "./components/SearchResults.vue";
+import AddFeedModal from "./components/AddFeedModal.vue";
+import EditFeedModal from "./components/EditFeedModal.vue";
 
 const {
   feeds,
@@ -118,136 +132,136 @@ const {
   getFeed,
   loadFeedContent,
   formatDate,
-  refreshAllFeeds
-} = useFeedManager()
+  refreshAllFeeds,
+} = useFeedManager();
 
 // UI State
-const showAddModal = ref(false)
-const showEditModal = ref(false)
-const editingFeed = ref({})
-const mobileMenuOpen = ref(false)
-const draggedIndex = ref(null)
-const dragOverIndex = ref(null)
-const isRefreshing = ref(false)
+const showAddModal = ref(false);
+const showEditModal = ref(false);
+const editingFeed = ref({});
+const mobileMenuOpen = ref(false);
+const draggedIndex = ref(null);
+const dragOverIndex = ref(null);
+const isRefreshing = ref(false);
 
 // Search
-const searchTerm = ref('')
-const isSearchActive = ref(false)
-const searchResults = ref([])
+const searchTerm = ref("");
+const isSearchActive = ref(false);
+const searchResults = ref([]);
 
 // Feed Management
 const handleAddFeed = async ({ name, url, fallbackUrl }) => {
-  const feed = addFeed(name, url, fallbackUrl)
-  showAddModal.value = false
-  await loadFeedContent(feed)
-}
+  const feed = addFeed(name, url, fallbackUrl);
+  showAddModal.value = false;
+  await loadFeedContent(feed);
+};
 
 const handleUpdateFeed = async ({ id, name, url, fallbackUrl }) => {
-  const feed = updateFeed(id, name, url, fallbackUrl)
-  showEditModal.value = false
+  const feed = updateFeed(id, name, url, fallbackUrl);
+  showEditModal.value = false;
   if (feed) {
-    await loadFeedContent(feed)
+    await loadFeedContent(feed);
   }
-}
+};
 
 const handleRemoveFeed = (feedId) => {
-  if (confirm('Möchtest du diesen Feed wirklich löschen?')) {
-    removeFeed(feedId)
+  if (confirm("Möchtest du diesen Feed wirklich löschen?")) {
+    removeFeed(feedId);
   }
-}
+};
 
 const openEditModal = (feedId) => {
-  const feed = getFeed(feedId)
+  const feed = getFeed(feedId);
   if (feed) {
-    editingFeed.value = { ...feed }
-    showEditModal.value = true
+    editingFeed.value = { ...feed };
+    showEditModal.value = true;
   }
-}
+};
 
 const scrollToFeed = (feedId) => {
-  mobileMenuOpen.value = false
-  const feed = getFeed(feedId)
+  mobileMenuOpen.value = false;
+  const feed = getFeed(feedId);
   if (feed && !feed.active) {
-    toggleFeedActive(feedId)
+    toggleFeedActive(feedId);
     setTimeout(() => {
-      const element = document.getElementById(`feed-${feedId}`)
+      const element = document.getElementById(`feed-${feedId}`);
       if (element) {
-        element.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        element.scrollIntoView({ behavior: "smooth", block: "start" });
       }
-    }, 100)
+    }, 100);
   } else {
-    const element = document.getElementById(`feed-${feedId}`)
+    const element = document.getElementById(`feed-${feedId}`);
     if (element) {
-      element.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      element.scrollIntoView({ behavior: "smooth", block: "start" });
     }
   }
-}
+};
 
 const handleRefreshAll = async () => {
-  isRefreshing.value = true
-  await refreshAllFeeds()
+  isRefreshing.value = true;
+  await refreshAllFeeds();
   if (isSearchActive.value) {
-    performSearch()
+    performSearch();
   }
-  isRefreshing.value = false
-}
+  isRefreshing.value = false;
+};
 
 // Drag & Drop
 const startDrag = (index, event) => {
-  draggedIndex.value = index
-  event.dataTransfer.effectAllowed = 'move'
-}
+  draggedIndex.value = index;
+  event.dataTransfer.effectAllowed = "move";
+};
 
 const endDrag = () => {
-  draggedIndex.value = null
-  dragOverIndex.value = null
-}
+  draggedIndex.value = null;
+  dragOverIndex.value = null;
+};
 
 const dropFeed = (index) => {
   if (draggedIndex.value !== null && draggedIndex.value !== index) {
-    reorderFeeds(draggedIndex.value, index)
+    reorderFeeds(draggedIndex.value, index);
   }
-  dragOverIndex.value = null
-}
+  dragOverIndex.value = null;
+};
 
 // Search
 const handleSearchInput = () => {
   if (searchTerm.value.trim().length === 0 && isSearchActive.value) {
-    clearSearch()
+    clearSearch();
   }
-}
+};
 
 const performSearch = () => {
   if (searchTerm.value.trim().length < 2) {
-    alert('Bitte mindestens 2 Zeichen eingeben')
-    return
+    alert("Bitte mindestens 2 Zeichen eingeben");
+    return;
   }
 
-  const searchLower = searchTerm.value.toLowerCase()
-  searchResults.value = allArticles.value.filter(article => {
-    const titleMatch = article.title.toLowerCase().includes(searchLower)
-    const descMatch = article.description.toLowerCase().includes(searchLower)
-    return titleMatch || descMatch
-  })
+  const searchLower = searchTerm.value.toLowerCase();
+  searchResults.value = allArticles.value.filter((article) => {
+    const titleMatch = article.title.toLowerCase().includes(searchLower);
+    const descMatch = article.description.toLowerCase().includes(searchLower);
+    return titleMatch || descMatch;
+  });
 
-  isSearchActive.value = true
-}
+  isSearchActive.value = true;
+};
 
 const clearSearch = () => {
-  searchTerm.value = ''
-  isSearchActive.value = false
-  searchResults.value = []
-}
+  searchTerm.value = "";
+  isSearchActive.value = false;
+  searchResults.value = [];
+};
 
 // Lifecycle
 onMounted(() => {
-  loadFeeds()
-  feeds.value.forEach(feed => {
+  loadFeeds();
+  feeds.value.forEach((feed) => {
     if (feed && feed.id && feed.active) {
-      loadFeedContent(feed)
+      loadFeedContent(feed);
     }
-  })
-})
+  });
+});
 </script>
 
 <style scoped>
