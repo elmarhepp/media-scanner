@@ -2,8 +2,10 @@ import { ref, computed } from "vue";
 
 const STORAGE_KEY = "rss-feeds-vue";
 const CORS_PROXIES = [
-  "https://api.codetabs.com/v1/proxy/?quest=",
   "https://api.allorigins.win/raw?url=",
+  "https://corsproxy.io/?",
+  "https://api.codetabs.com/v1/proxy/?quest=",
+  "https://cors-anywhere.herokuapp.com/",
 ];
 const RSS2JSON_ENDPOINT = "https://api.rss2json.com/v1/api.json?rss_url=";
 const RECOMMENDED_FEEDS = [
@@ -57,32 +59,67 @@ const RECOMMENDED_FEEDS = [
     topics: ["politics", "general"],
   },
   {
-    name: "Telepolis",
-    url: "https://www.telepolis.de/rss.xml",
+    name: "Berliner Zeitung",
+    url: "https://www.berliner-zeitung.de/feed.xml",
     region: "de",
     profile: "alternative",
     topics: ["politics", "general"],
   },
   {
-    name: "Cicero",
-    url: "https://www.cicero.de/rss",
+    name: "Apollo News",
+    url: "https://apollo-news.net/feed/",
     region: "de",
     profile: "alternative",
     topics: ["politics", "general"],
   },
   {
-    name: "nd aktuell",
-    url: "https://www.nd-aktuell.de/rss",
+    name: "Epoch Times",
+    url: "https://www.epochtimes.de/feed",
     region: "de",
     profile: "alternative",
     topics: ["politics", "general"],
   },
   {
-    name: "Reuters World",
-    url: "https://www.reutersagency.com/feed/?best-topics=world&post_type=best",
-    region: "intl",
-    profile: "mainstream",
-    topics: ["general", "politics"],
+    name: "Anti-Spiegel",
+    url: "https://anti-spiegel.ru/feed/",
+    region: "de",
+    profile: "alternative",
+    topics: ["politics", "general"],
+  },
+  {
+    name: "Apolut",
+    url: "https://apolut.net/feed/",
+    region: "de",
+    profile: "alternative",
+    topics: ["politics", "general"],
+  },
+  {
+    name: "NIUS",
+    url: "https://www.nius.de/rss",
+    region: "de",
+    profile: "alternative",
+    topics: ["politics", "general"],
+  },
+  {
+    name: "Tichys Einblick",
+    url: "https://www.tichyseinblick.de/feed/",
+    region: "de",
+    profile: "alternative",
+    topics: ["politics", "general"],
+  },
+  {
+    name: "tkp",
+    url: "https://tkp.at/feed",
+    region: "de",
+    profile: "alternative",
+    topics: ["politics", "general"],
+  },
+  {
+    name: "reitschuster.de",
+    url: "https://reitschuster.de/feed/",
+    region: "de",
+    profile: "alternative",
+    topics: ["politics", "general"],
   },
   {
     name: "BBC World",
@@ -441,7 +478,7 @@ export function useFeedManager() {
         console.log(`Versuche Proxy ${i + 1}/${CORS_PROXIES.length}`);
 
         const response = await fetch(proxy + encodeURIComponent(url), {
-          signal: AbortSignal.timeout(10000),
+          signal: AbortSignal.timeout(15000),
         });
 
         if (!response.ok) {
@@ -486,7 +523,7 @@ export function useFeedManager() {
       const response = await fetch(
         RSS2JSON_ENDPOINT + encodeURIComponent(url),
         {
-          signal: AbortSignal.timeout(10000),
+          signal: AbortSignal.timeout(15000),
         },
       );
 
